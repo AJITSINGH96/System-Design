@@ -41,7 +41,6 @@ function TopicContent() {
         setLoading(true);
         setError("");
 
-        // Fetch topic
         const { data: topicData, error: topicError } =
           await supabase
             .from("topics")
@@ -53,7 +52,6 @@ function TopicContent() {
 
         setTopic(topicData);
 
-        // Fetch category
         const { data: categoryData, error: categoryError } =
           await supabase
             .from("categories")
@@ -65,7 +63,6 @@ function TopicContent() {
 
         setCategory(categoryData);
 
-        // Fetch published articles for this topic
         const { data: articleData, error: articleError } =
           await supabase
             .from("articles")
@@ -111,6 +108,10 @@ function TopicContent() {
     );
   }
 
+  const createArticleUrl =
+    `/admin/articles/new?categoryId=${encodeURIComponent(topic.category_id)}` +
+    `&topicId=${encodeURIComponent(topic.id)}`;
+
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <header className="h-16 border-b border-gray-800 flex items-center px-6">
@@ -120,12 +121,12 @@ function TopicContent() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-12">
-        <Link
-          href="/"
-          className="text-blue-400 hover:text-blue-300 text-sm"
-        >
-          ← Back to topics
-        </Link>
+       <Link
+            href={`/?category=${topic.category_id}`}
+            className="text-blue-400 hover:text-blue-300 text-sm"
+            >
+            ← Back to topics
+            </Link>
 
         <p className="text-blue-400 text-sm mt-10 mb-3">
           {category?.name.toUpperCase()}
@@ -140,9 +141,18 @@ function TopicContent() {
         </p>
 
         <article className="border-t border-gray-800 pt-8">
-          <h2 className="text-2xl font-semibold mb-6">
-            Published Articles
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <h2 className="text-2xl font-semibold">
+              Published Articles
+            </h2>
+
+            <Link
+              href={createArticleUrl}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition"
+            >
+              + Create Article
+            </Link>
+          </div>
 
           {articles.length === 0 ? (
             <p className="text-gray-400 leading-8">
@@ -152,20 +162,20 @@ function TopicContent() {
             <div className="space-y-3">
               {articles.map((article) => (
                 <Link
-                    key={article.id}
-                    href={`/articles/${article.slug}`}
-                    className="block border border-gray-800 rounded-xl p-5 hover:border-blue-500 transition"
+                  key={article.id}
+                  href={`/articles/${article.slug}`}
+                  className="block border border-gray-800 rounded-xl p-5 hover:border-blue-500 transition"
                 >
-                    <h3 className="font-semibold text-lg">
+                  <h3 className="font-semibold text-lg">
                     {article.title}
-                    </h3>
+                  </h3>
 
-                    <p className="text-gray-500 text-sm mt-2">
+                  <p className="text-gray-500 text-sm mt-2">
                     Published{" "}
                     {new Date(article.created_at).toLocaleDateString()}
-                    </p>
+                  </p>
                 </Link>
-                ))}
+              ))}
             </div>
           )}
         </article>

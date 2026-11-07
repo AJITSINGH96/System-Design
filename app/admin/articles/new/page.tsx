@@ -30,7 +30,6 @@ type Topic = {
 
 export default function NewArticlePage() {
   const router = useRouter();
-
   const [supabase] = useState(() => createClient());
 
   const [title, setTitle] = useState("");
@@ -44,7 +43,8 @@ export default function NewArticlePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState<"success" | "error">("success");
+  const [messageType, setMessageType] =
+    useState<"success" | "error">("success");
 
   const slug = title
     .trim()
@@ -63,9 +63,34 @@ export default function NewArticlePage() {
         console.error(categoryResult.error || topicResult.error);
         setMessage("Could not load categories and topics.");
         setMessageType("error");
-      } else {
-        setCategories(categoryResult.data ?? []);
-        setTopics(topicResult.data ?? []);
+        setLoading(false);
+        return;
+      }
+
+      const categoryData = categoryResult.data ?? [];
+      const topicData = topicResult.data ?? [];
+
+      setCategories(categoryData);
+      setTopics(topicData);
+
+      // Read category and topic IDs passed from the topic page.
+      const queryParams = new URLSearchParams(window.location.search);
+      const requestedCategoryId = queryParams.get("categoryId");
+      const requestedTopicId = queryParams.get("topicId");
+
+      const requestedTopic = topicData.find(
+        (topic) =>
+          topic.id === requestedTopicId &&
+          topic.category_id === requestedCategoryId
+      );
+
+      const requestedCategoryExists = categoryData.some(
+        (category) => category.id === requestedCategoryId
+      );
+
+      if (requestedTopic && requestedCategoryExists) {
+        setCategoryId(requestedCategoryId!);
+        setTopicId(requestedTopic.id);
       }
 
       setLoading(false);
@@ -108,6 +133,18 @@ export default function NewArticlePage() {
 
     if (!categoryId || !topicId) {
       setMessage("Please select a category and topic.");
+      setMessageType("error");
+      return;
+    }
+
+    const selectedTopic = topics.find(
+      (topic) =>
+        topic.id === topicId &&
+        topic.category_id === categoryId
+    );
+
+    if (!selectedTopic) {
+      setMessage("Please select a valid topic for this category.");
       setMessageType("error");
       return;
     }
@@ -174,7 +211,6 @@ export default function NewArticlePage() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-
       <header className="h-16 border-b border-gray-800 flex items-center px-6">
         <Link href="/" className="text-xl font-bold">
           System Design Hub
@@ -196,9 +232,8 @@ export default function NewArticlePage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-10">
-
-        <Link href="/" className="text-blue-400 text-sm">
-          ← Back to home
+        <Link href="/articles" className="text-blue-400 text-sm">
+          ← Back to articles
         </Link>
 
         <h1 className="text-3xl font-bold mt-8 mb-2">
@@ -210,7 +245,6 @@ export default function NewArticlePage() {
         </p>
 
         <div className="space-y-6">
-
           <div>
             <label className="block text-sm mb-2">
               Article title
@@ -232,7 +266,6 @@ export default function NewArticlePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-
             <div>
               <label className="block text-sm mb-2">
                 Category
@@ -267,7 +300,7 @@ export default function NewArticlePage() {
               <select
                 value={topicId}
                 onChange={(e) => setTopicId(e.target.value)}
-                disabled={!categoryId}
+                disabled={!categoryId || loading}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3"
               >
                 <option value="">Select topic</option>
@@ -279,8 +312,13 @@ export default function NewArticlePage() {
                 ))}
               </select>
             </div>
-
           </div>
+
+          {topicId && (
+            <p className="text-sm text-green-400">
+              This article will be added to the selected topic.
+            </p>
+          )}
 
           <div>
             <label className="block text-sm mb-3">
@@ -303,6 +341,13 @@ export default function NewArticlePage() {
           )}
 
           <div className="flex justify-end gap-3 border-t border-gray-800 pt-6">
+            <button
+              type="button"
+              onClick={() => router.push("/articles")}
+              className="px-6 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
+            >
+              Cancel
+            </button>
 
             <button
               type="button"
@@ -321,9 +366,7 @@ export default function NewArticlePage() {
             >
               {saving ? "Saving..." : "Publish Article"}
             </button>
-
           </div>
-
         </div>
       </main>
     </div>

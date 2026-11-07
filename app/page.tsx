@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 type Category = {
   id: string;
@@ -19,16 +20,27 @@ type Topic = {
   description: string;
 };
 
+const ADMIN_ID = "128968c8-eea9-44f7-be54-2c32cab65e30";
+
 export default function Home() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const [authClient] = useState(() => createClient());
 
   useEffect(() => {
     async function fetchData() {
       try {
+        // Check whether the current user is the admin
+        const { data: authData } = await authClient.auth.getUser();
+
+        setIsAdmin(authData.user?.id === ADMIN_ID);
+
+        // Fetch categories and topics
         const [categoryResult, topicResult] = await Promise.all([
           supabase.from("categories").select("id, name, slug"),
           supabase.from("topics").select(
@@ -45,13 +57,20 @@ export default function Home() {
         setCategories(categoryData);
         setTopics(topicData);
 
-        const defaultCategory =
+        const searchParams = new URLSearchParams(window.location.search);
+        const categoryFromUrl = searchParams.get("category");
+
+        const selectedCategory =
+          categoryData.find(
+            (category) => category.id === categoryFromUrl
+          ) ??
           categoryData.find(
             (category) => category.name === "Fundamentals"
-          ) ?? categoryData[0];
+          ) ??
+          categoryData[0];
 
-        if (defaultCategory) {
-          setSelectedCategoryId(defaultCategory.id);
+        if (selectedCategory) {
+          setSelectedCategoryId(selectedCategory.id);
         }
       } catch (err) {
         console.error("Supabase error:", err);
@@ -62,7 +81,7 @@ export default function Home() {
     }
 
     fetchData();
-  }, []);
+  }, [authClient]);
 
   const filteredTopics = topics.filter(
     (topic) => topic.category_id === selectedCategoryId
@@ -74,19 +93,37 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
-      <header className="h-16 border-b border-gray-800 flex items-center px-6">
+      <header className="min-h-16 border-b border-gray-800 flex items-center px-6 py-3">
         <Link href="/" className="text-xl font-bold">
           System Design Hub
         </Link>
 
-        <div className="ml-auto">
-        <Link
-          href="/admin/articles/new"
-          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition"
-        >
-          + Create Article
-        </Link>
-      </div>
+        <div className="ml-auto flex items-center gap-3 flex-wrap justify-end">
+          <Link
+            href="/articles"
+            className="px-4 py-2 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 text-sm font-medium transition"
+          >
+            All Articles
+          </Link>
+
+          {isAdmin && (
+            <>
+              <Link
+                href="/admin/manage"
+                className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium transition"
+              >
+                Manage Categories
+              </Link>
+
+              <Link
+                href="/admin/articles/new"
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition"
+              >
+                + Create Article
+              </Link>
+            </>
+          )}
+        </div>
       </header>
 
       <div className="flex">
@@ -95,21 +132,40 @@ export default function Home() {
             CATEGORIES
           </h2>
 
-          <nav className="space-y-2">
-            {categories.map((category) => (
-              <button
-                key={category.id}
-                onClick={() => setSelectedCategoryId(category.id)}
-                className={`block w-full text-left rounded-lg px-3 py-2 text-sm ${
-                  selectedCategoryId === category.id
-                    ? "bg-blue-500/10 text-blue-400 font-semibold"
-                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                }`}
+          
+      <nav className="space-y-2">
+        {categories.map((category) => (
+          <div
+            key={category.id}
+            className={`flex items-center gap-2 rounded-lg px-2 ${
+              selectedCategoryId === category.id
+                ? "bg-blue-500/10"
+                : "hover:bg-gray-800"
+            }`}
+          >
+            <button
+              onClick={() => setSelectedCategoryId(category.id)}
+              className={`flex-1 text-left py-2 text-sm truncate ${
+                selectedCategoryId === category.id
+                  ? "text-blue-400 font-semibold"
+                  : "text-gray-300"
+              }`}
+            >
+              {category.name}
+            </button>
+
+            {isAdmin && (
+              <Link
+                href={`/admin/manage/topics/${category.id}`}
+                className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 shrink-0"
               >
-                {category.name}
-              </button>
-            ))}
-          </nav>
+                Edit
+              </Link>
+            )}
+          </div>
+        ))}
+      </nav>
+
         </aside>
 
         <main className="flex-1 p-10">

@@ -24,3 +24,17 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* Dark theme for React Flow zoom controls */
+.architecture-controls .react-flow__controls-button {
+  background-color: #111827 !important;
+  border-bottom: 1px solid #374151 !important;
+  fill: #e5e7eb !important;
+}
+
+.architecture-controls .react-flow__controls-button:hover {
+  background-color: #1f2937 !important;
+}
+
+.architecture-controls .react-flow__controls-button svg {
+  fill: #e5e7eb !important;
+}
