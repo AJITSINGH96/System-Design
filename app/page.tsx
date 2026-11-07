@@ -1,69 +1,163 @@
-import Image from "next/image";
+
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+type Topic = {
+  id: string;
+  category_id: string;
+  title: string;
+  slug: string;
+  description: string;
+};
 
 export default function Home() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [categoryResult, topicResult] = await Promise.all([
+          supabase.from("categories").select("id, name, slug"),
+          supabase.from("topics").select(
+            "id, category_id, title, slug, description"
+          ),
+        ]);
+
+        if (categoryResult.error) throw categoryResult.error;
+        if (topicResult.error) throw topicResult.error;
+
+        const categoryData = categoryResult.data ?? [];
+        const topicData = topicResult.data ?? [];
+
+        setCategories(categoryData);
+        setTopics(topicData);
+
+        const defaultCategory =
+          categoryData.find(
+            (category) => category.name === "Fundamentals"
+          ) ?? categoryData[0];
+
+        if (defaultCategory) {
+          setSelectedCategoryId(defaultCategory.id);
+        }
+      } catch (err) {
+        console.error("Supabase error:", err);
+        setError("Unable to load content. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+  const filteredTopics = topics.filter(
+    (topic) => topic.category_id === selectedCategoryId
+  );
+
+  const selectedCategory = categories.find(
+    (category) => category.id === selectedCategoryId
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-gray-950 text-gray-100">
+      <header className="h-16 border-b border-gray-800 flex items-center px-6">
+        <Link href="/" className="text-xl font-bold">
+          System Design Hub
+        </Link>
+
+        <div className="ml-auto text-sm text-gray-400">
+          Knowledge Base
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </header>
+
+      <div className="flex">
+        <aside className="w-64 min-h-screen border-r border-gray-800 p-5 shrink-0">
+          <h2 className="text-sm font-semibold text-gray-400 mb-5">
+            CATEGORIES
+          </h2>
+
+          <nav className="space-y-2">
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => setSelectedCategoryId(category.id)}
+                className={`block w-full text-left rounded-lg px-3 py-2 text-sm ${
+                  selectedCategoryId === category.id
+                    ? "bg-blue-500/10 text-blue-400 font-semibold"
+                    : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                }`}
+              >
+                {category.name}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="flex-1 p-10">
+          <div className="max-w-3xl">
+            <p className="text-blue-400 text-sm mb-3">
+              YOUR SYSTEM DESIGN LEARNING SPACE
+            </p>
+
+            <h2 className="text-3xl font-bold mb-3">
+              {selectedCategory?.name ?? "System Design"}
+            </h2>
+
+            <p className="text-gray-400 leading-7 mb-8">
+              Explore important concepts, architecture patterns
+              and engineering principles.
+            </p>
+
+            {loading ? (
+              <p className="text-gray-400">Loading content...</p>
+            ) : error ? (
+              <p className="text-red-400">{error}</p>
+            ) : (
+              <div className="space-y-3">
+                {filteredTopics.map((topic) => (
+                  <Link
+                    key={topic.id}
+                    href={`/topics/${topic.slug}`}
+                    className="block border border-gray-800 rounded-xl p-5 hover:border-blue-500 transition"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold">{topic.title}</p>
+
+                        <p className="text-gray-500 text-sm mt-1">
+                          {topic.description}
+                        </p>
+                      </div>
+
+                      <span className="text-gray-500">→</span>
+                    </div>
+                  </Link>
+                ))}
+
+                {filteredTopics.length === 0 && (
+                  <p className="text-gray-500">
+                    No topics available in this category yet.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
