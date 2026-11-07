@@ -8,8 +8,12 @@ import {
   MiniMap,
   Handle,
   Position,
-  type Node,
-  type Edge,
+} from "@xyflow/react";
+
+import type {
+  Node,
+  Edge,
+  NodeProps,
 } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
@@ -18,15 +22,21 @@ import type {
   ArchitectureDiagramData,
 } from "@/components/tiptap/ArchitectureDiagram";
 
+// --------------------------------------------------
+// Node data
+// --------------------------------------------------
+
 type ArchitectureNodeData = {
   label: string;
 };
 
+// --------------------------------------------------
+// Architecture Box
+// --------------------------------------------------
+
 function ArchitectureNode({
   data,
-}: {
-  data: ArchitectureNodeData;
-}) {
+}: NodeProps<Node<ArchitectureNodeData>>) {
   return (
     <div className="min-w-[150px] rounded-lg border-2 border-blue-400 bg-gray-900 px-4 py-3 text-center shadow-lg">
       <Handle type="target" position={Position.Top} />
@@ -40,9 +50,34 @@ function ArchitectureNode({
   );
 }
 
+// --------------------------------------------------
+// Text Annotation
+// --------------------------------------------------
+
+function TextAnnotationNode({
+  data,
+}: NodeProps<Node<ArchitectureNodeData>>) {
+  return (
+    <div className="min-w-[100px] max-w-[280px] rounded border border-dashed border-yellow-400 bg-yellow-100 px-3 py-2 text-gray-900 shadow">
+      <div className="whitespace-pre-wrap text-sm font-medium text-gray-900">
+        {data.label}
+      </div>
+    </div>
+  );
+}
+
+// --------------------------------------------------
+// Node Types
+// --------------------------------------------------
+
 const nodeTypes = {
   architecture: ArchitectureNode,
+  textAnnotation: TextAnnotationNode,
 };
+
+// --------------------------------------------------
+// Viewer
+// --------------------------------------------------
 
 type Props = {
   diagram: ArchitectureDiagramData;
@@ -71,24 +106,27 @@ export default function ArchitectureDiagramViewer({
         fitView
         proOptions={{ hideAttribution: true }}
       >
-        <Background />
+        <Background color="#555" gap={20} />
+
         <Controls
-        showInteractive={false}
-        className="architecture-controls"
+          showInteractive={false}
+          className="architecture-controls"
         />
+
         <MiniMap
-            pannable
-            zoomable
-            bgColor="#111827"
-            maskColor="rgba(0, 0, 0, 0.55)"
-            nodeColor="#3b82f6"
-            nodeStrokeColor="#60a5fa"
-            style={{
-                backgroundColor: "#111827",
-                border: "1px solid #374151",
-                borderRadius: "8px",
-            }}
-            />
+          nodeColor={(node) =>
+            node.type === "textAnnotation"
+              ? "#eab308"
+              : "#3b82f6"
+          }
+          nodeStrokeColor="#64748b"
+          maskColor="rgba(0, 0, 0, 0.65)"
+          style={{
+            backgroundColor: "#111827",
+            border: "1px solid #374151",
+            borderRadius: "8px",
+          }}
+        />
       </ReactFlow>
     </div>
   );
