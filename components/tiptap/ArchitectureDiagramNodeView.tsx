@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -22,19 +23,25 @@ export default function ArchitectureDiagramNodeView({
 
     if (typeof position !== "number") return;
 
+    // Keep a separately typed, validated position for callbacks.
+    const diagramPosition: number = position;
+
     const newTab = window.open("/diagram-editor?mode=edit", "_blank");
 
-    if (!newTab) {
+    if (newTab === null) {
       alert("Please allow pop-ups for this website.");
       return;
     }
 
+    // Use this non-null alias inside the event handler.
+    const editorWindow = newTab;
+
     function handleMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
-      if (event.source !== newTab) return;
+      if (event.source !== editorWindow) return;
 
       if (event.data?.type === "DIAGRAM_EDITOR_READY") {
-        newTab.postMessage(
+        editorWindow.postMessage(
           {
             type: "LOAD_EXISTING_DIAGRAM",
             diagram,
@@ -48,9 +55,7 @@ export default function ArchitectureDiagramNodeView({
           event.data.diagram as ArchitectureDiagramData;
 
         const updated = editor.commands.command(({ tr }) => {
-          if (typeof position !== "number") return false;
-
-          tr.setNodeMarkup(position, undefined, {
+          tr.setNodeMarkup(diagramPosition, undefined, {
             ...node.attrs,
             diagram: updatedDiagram,
           });
@@ -58,7 +63,7 @@ export default function ArchitectureDiagramNodeView({
           return true;
         });
 
-        newTab.postMessage(
+        editorWindow.postMessage(
           {
             type: updated
               ? "ARCHITECTURE_DIAGRAM_UPDATED_ACK"
