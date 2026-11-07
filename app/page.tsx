@@ -79,9 +79,14 @@ export default function Home() {
           System Design Hub
         </Link>
 
-        <div className="ml-auto text-sm text-gray-400">
-          Knowledge Base
-        </div>
+        <div className="ml-auto">
+        <Link
+          href="/admin/articles/new"
+          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition"
+        >
+          + Create Article
+        </Link>
+      </div>
       </header>
 
       <div className="flex">
