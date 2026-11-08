@@ -32,7 +32,7 @@ export default function AdminLoginPage() {
       return;
     }
 
-    router.push("/admin/articles/new");
+    router.push("/");
     router.refresh();
   }
 

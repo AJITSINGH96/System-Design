@@ -106,7 +106,7 @@ export default function Home() {
             All Articles
           </Link>
 
-          {isAdmin && (
+          {isAdmin ? (
             <>
               <Link
                 href="/admin/manage"
@@ -122,6 +122,13 @@ export default function Home() {
                 + Create Article
               </Link>
             </>
+          ) : (
+            <Link
+              href="/admin/login"
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition"
+            >
+              Login
+            </Link>
           )}
         </div>
       </header>
@@ -132,40 +139,38 @@ export default function Home() {
             CATEGORIES
           </h2>
 
-          
-      <nav className="space-y-2">
-        {categories.map((category) => (
-          <div
-            key={category.id}
-            className={`flex items-center gap-2 rounded-lg px-2 ${
-              selectedCategoryId === category.id
-                ? "bg-blue-500/10"
-                : "hover:bg-gray-800"
-            }`}
-          >
-            <button
-              onClick={() => setSelectedCategoryId(category.id)}
-              className={`flex-1 text-left py-2 text-sm truncate ${
-                selectedCategoryId === category.id
-                  ? "text-blue-400 font-semibold"
-                  : "text-gray-300"
-              }`}
-            >
-              {category.name}
-            </button>
-
-            {isAdmin && (
-              <Link
-                href={`/admin/manage/topics/${category.id}`}
-                className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 shrink-0"
+          <nav className="space-y-2">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className={`flex items-center gap-2 rounded-lg px-2 ${
+                  selectedCategoryId === category.id
+                    ? "bg-blue-500/10"
+                    : "hover:bg-gray-800"
+                }`}
               >
-                Edit
-              </Link>
-            )}
-          </div>
-        ))}
-      </nav>
+                <button
+                  onClick={() => setSelectedCategoryId(category.id)}
+                  className={`flex-1 text-left py-2 text-sm truncate ${
+                    selectedCategoryId === category.id
+                      ? "text-blue-400 font-semibold"
+                      : "text-gray-300"
+                  }`}
+                >
+                  {category.name}
+                </button>
 
+                {isAdmin && (
+                  <Link
+                    href={`/admin/manage/topics/${category.id}`}
+                    className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 shrink-0"
+                  >
+                    Edit
+                  </Link>
+                )}
+              </div>
+            ))}
+          </nav>
         </aside>
 
         <main className="flex-1 p-10">
