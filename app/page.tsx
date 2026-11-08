@@ -27,18 +27,6 @@ type Article = {
   created_at: string;
 };
 
-type CommunityArticle = {
-  id: string;
-  user_id: string;
-  title: string;
-  slug: string;
-  description: string | null;
-  created_at: string;
-  authorName: string;
-  username: string;
-  avatarUrl: string | null;
-};
-
 const ADMIN_ID = "128968c8-eea9-44f7-be54-2c32cab65e30";
 
 const categoryDetails: Record<
@@ -71,10 +59,6 @@ export default function Home() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [articles, setArticles] = useState<Article[]>([]);
-  const [communityArticles, setCommunityArticles] = useState<CommunityArticle[]>([]);
-  const [communitySearch, setCommunitySearch] = useState("");
-  const [communityLoading, setCommunityLoading] = useState(true);
-  const [communityError, setCommunityError] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -86,12 +70,11 @@ export default function Home() {
 
   const [authClient] = useState(() => createClient());
 
-  // Set the year after mounting.
   useEffect(() => {
     setCurrentYear(new Date().getFullYear());
   }, []);
 
-  // Check authentication and keep UI in sync.
+  // Check authentication and keep navigation in sync.
   useEffect(() => {
     let mounted = true;
 
@@ -106,17 +89,19 @@ export default function Home() {
 
         if (error) {
           console.error("Authentication error:", error);
-          setIsAuthenticated(false);
           setIsAdmin(false);
+          setIsAuthenticated(false);
         } else {
-          setIsAuthenticated(!!session?.user);
-          setIsAdmin(session?.user?.id === ADMIN_ID);
+          const user = session?.user;
+
+          setIsAuthenticated(!!user);
+          setIsAdmin(user?.id === ADMIN_ID);
         }
       } catch (err) {
         if (mounted) {
           console.error("Authentication check failed:", err);
-          setIsAuthenticated(false);
           setIsAdmin(false);
+          setIsAuthenticated(false);
         }
       } finally {
         if (mounted) {
@@ -132,8 +117,10 @@ export default function Home() {
     } = authClient.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
 
-      setIsAuthenticated(!!session?.user);
-      setIsAdmin(session?.user?.id === ADMIN_ID);
+      const user = session?.user;
+
+      setIsAuthenticated(!!user);
+      setIsAdmin(user?.id === ADMIN_ID);
       setAuthLoading(false);
     });
 
@@ -143,11 +130,11 @@ export default function Home() {
     };
   }, [authClient]);
 
-  // Fetch categories, topics and published articles.
+  // Fetch global categories, topics and published articles.
   useEffect(() => {
     async function fetchData() {
       try {
-        const [categoryResult, topicResult, articleResult, communityResult] =
+        const [categoryResult, topicResult, articleResult] =
           await Promise.all([
             supabase.from("categories").select("id, name, slug"),
 
@@ -161,23 +148,11 @@ export default function Home() {
               .eq("status", "published")
               .order("created_at", { ascending: false })
               .limit(3),
-
-            supabase
-              .from("user_articles")
-              .select("id, user_id, title, slug, description, created_at")
-              .eq("status", "published")
-              .eq("visibility", "public")
-              .order("created_at", { ascending: false })
-              .limit(100),
           ]);
 
         if (categoryResult.error) throw categoryResult.error;
         if (topicResult.error) throw topicResult.error;
         if (articleResult.error) throw articleResult.error;
-        if (communityResult.error) {
-          console.error("Community articles error:", communityResult.error);
-          setCommunityError("Unable to load community articles right now.");
-        }
 
         const categoryData = categoryResult.data ?? [];
         const topicData = topicResult.data ?? [];
@@ -185,38 +160,6 @@ export default function Home() {
         setCategories(categoryData);
         setTopics(topicData);
         setArticles(articleResult.data ?? []);
-
-        const communityData = communityResult.data ?? [];
-        if (communityData.length > 0) {
-          const userIds = [...new Set(communityData.map((item) => item.user_id))];
-          const { data: profileData, error: profileError } = await supabase
-            .from("user_profiles")
-            .select("id, username, display_name, avatar_url")
-            .in("id", userIds);
-
-          if (profileError) {
-            console.error("Community profiles error:", profileError);
-            setCommunityError("Unable to load community authors right now.");
-          }
-
-          const profileMap = new Map(
-            (profileData ?? []).map((profile) => [profile.id, profile])
-          );
-
-          setCommunityArticles(
-            communityData.map((item) => {
-              const profile = profileMap.get(item.user_id);
-              return {
-                ...item,
-                authorName: profile?.display_name ?? "Community member",
-                username: profile?.username ?? "",
-                avatarUrl: profile?.avatar_url ?? null,
-              };
-            })
-          );
-        } else {
-          setCommunityArticles([]);
-        }
 
         const searchParams = new URLSearchParams(window.location.search);
         const categoryFromUrl = searchParams.get("category");
@@ -238,23 +181,11 @@ export default function Home() {
         setError("Unable to load content. Please try again.");
       } finally {
         setLoading(false);
-        setCommunityLoading(false);
       }
     }
 
     fetchData();
   }, []);
-
-  const filteredCommunityArticles = communityArticles.filter((article) => {
-    const query = communitySearch.trim().toLowerCase();
-    if (!query) return true;
-    return (
-      article.title.toLowerCase().includes(query) ||
-      (article.description ?? "").toLowerCase().includes(query) ||
-      article.authorName.toLowerCase().includes(query) ||
-      article.username.toLowerCase().includes(query)
-    );
-  });
 
   const filteredTopics = topics.filter(
     (topic) => topic.category_id === selectedCategoryId
@@ -264,7 +195,6 @@ export default function Home() {
     (category) => category.id === selectedCategoryId
   );
 
-  // Scroll to categories when Start Learning is clicked.
   function startLearning() {
     document.getElementById("categories")?.scrollIntoView({
       behavior: "smooth",
@@ -297,7 +227,6 @@ export default function Home() {
     );
   }
 
-  // Logout safely, including when the session is already missing.
   async function handleLogout() {
     if (loggingOut) return;
 
@@ -322,8 +251,8 @@ export default function Home() {
         }
       }
 
-      setIsAuthenticated(false);
       setIsAdmin(false);
+      setIsAuthenticated(false);
 
       window.location.replace("/");
     } catch (err) {
@@ -354,7 +283,7 @@ export default function Home() {
               href="/community"
               className="rounded-lg px-3 py-2 text-sm text-gray-300 transition hover:bg-gray-800 hover:text-white"
             >
-              Community
+              Community Articles
             </Link>
 
             {!authLoading && (
@@ -397,7 +326,7 @@ export default function Home() {
                       type="button"
                       onClick={handleLogout}
                       disabled={loggingOut}
-                      className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-semibold text-gray-200 transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-gray-800 hover:text-white disabled:opacity-60"
                     >
                       {loggingOut ? "Logging out..." : "Logout"}
                     </button>
@@ -409,6 +338,13 @@ export default function Home() {
                       className="rounded-lg px-3 py-2 text-sm text-gray-300 transition hover:bg-gray-800 hover:text-white"
                     >
                       Admin Login
+                    </Link>
+
+                    <Link
+                      href="/login"
+                      className="rounded-lg px-3 py-2 text-sm font-semibold text-gray-200 transition hover:bg-gray-800 hover:text-white"
+                    >
+                      Sign In
                     </Link>
 
                     <Link
@@ -556,7 +492,6 @@ export default function Home() {
                       </div>
                     </button>
 
-                    {/* ADMIN-ONLY TOPIC MANAGEMENT LINK */}
                     {isAdmin && (
                       <div className="mt-5 border-t border-gray-800 pt-4">
                         <Link
@@ -629,106 +564,6 @@ export default function Home() {
             ) : (
               <p className="text-gray-400">
                 Published articles will appear here.
-              </p>
-            )}
-          </div>
-        </section>
-
-        {/* COMMUNITY ARTICLES */}
-        <section className="border-b border-gray-800/70 bg-[#080d19]">
-          <div className="mx-auto max-w-7xl px-5 py-20 sm:px-8">
-            <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="mb-3 text-sm font-semibold tracking-widest text-blue-400">
-                  BUILT BY THE COMMUNITY
-                </p>
-                <h2 className="text-3xl font-bold tracking-tight">
-                  Community Articles
-                </h2>
-                <p className="mt-3 max-w-2xl leading-7 text-gray-400">
-                  Explore system design articles published publicly by other members.
-                </p>
-              </div>
-              <Link
-                href="/community"
-                className="text-sm font-semibold text-blue-400 transition hover:text-blue-300"
-              >
-                View all community articles →
-              </Link>
-            </div>
-
-            <div className="mb-8 max-w-xl">
-              <label htmlFor="community-article-search" className="sr-only">
-                Search community articles
-              </label>
-              <input
-                id="community-article-search"
-                type="search"
-                value={communitySearch}
-                onChange={(event) => setCommunitySearch(event.target.value)}
-                placeholder="Search by article title, description or author..."
-                className="w-full rounded-xl border border-gray-700 bg-[#0d1423] px-4 py-3 text-sm text-gray-100 outline-none transition placeholder:text-gray-500 focus:border-blue-500"
-              />
-            </div>
-
-            {communityLoading ? (
-              <p className="text-gray-400">Loading community articles...</p>
-            ) : communityError ? (
-              <p className="text-red-400">{communityError}</p>
-            ) : filteredCommunityArticles.length > 0 ? (
-              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-                {filteredCommunityArticles.map((article) => (
-                  <article
-                    key={article.id}
-                    className="rounded-2xl border border-gray-800 bg-[#0d1423] p-6 transition hover:border-blue-500/50"
-                  >
-                    <div className="mb-4 flex items-center gap-3">
-                      {article.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={article.avatarUrl}
-                          alt=""
-                          className="h-9 w-9 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/15 text-sm font-semibold text-blue-300">
-                          {article.authorName.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-gray-200">
-                          {article.authorName}
-                        </p>
-                        {article.username && (
-                          <p className="text-xs text-gray-500">@{article.username}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <h3 className="text-lg font-semibold leading-7 text-gray-100">
-                      {article.title}
-                    </h3>
-                    {article.description && (
-                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">
-                        {article.description}
-                      </p>
-                    )}
-                    <p className="mt-5 text-xs text-gray-500">
-                      {new Date(article.created_at).toLocaleDateString()}
-                    </p>
-                  </article>
-                ))}
-              </div>
-            ) : communityArticles.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-gray-700 bg-[#0d1423]/60 px-6 py-10 text-center">
-                <p className="font-medium text-gray-300">No public community articles yet.</p>
-                <p className="mt-2 text-sm text-gray-500">
-                  When members publish public articles, they will appear here.
-                </p>
-              </div>
-            ) : (
-              <p className="rounded-xl border border-gray-800 p-6 text-gray-400">
-                No community articles match “{communitySearch}”. Try another search.
               </p>
             )}
           </div>
@@ -819,6 +654,10 @@ export default function Home() {
 
             <Link href="/articles" className="hover:text-white">
               Articles
+            </Link>
+
+            <Link href="/community" className="hover:text-white">
+              Community
             </Link>
           </div>
         </div>
