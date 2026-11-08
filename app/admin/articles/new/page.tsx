@@ -28,6 +28,8 @@ type Topic = {
   category_id: string;
 };
 
+const ADMIN_ID = "128968c8-eea9-44f7-be54-2c32cab65e30";
+
 export default function NewArticlePage() {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -54,46 +56,48 @@ export default function NewArticlePage() {
 
   useEffect(() => {
     async function fetchData() {
-      const [categoryResult, topicResult] = await Promise.all([
-        supabase.from("categories").select("id, name"),
-        supabase.from("topics").select("id, title, category_id"),
-      ]);
+      try {
+        const [categoryResult, topicResult] = await Promise.all([
+          supabase.from("categories").select("id, name"),
+          supabase.from("topics").select("id, title, category_id"),
+        ]);
 
-      if (categoryResult.error || topicResult.error) {
-        console.error(categoryResult.error || topicResult.error);
+        if (categoryResult.error || topicResult.error) {
+          throw categoryResult.error || topicResult.error;
+        }
+
+        const categoryData = categoryResult.data ?? [];
+        const topicData = topicResult.data ?? [];
+
+        setCategories(categoryData);
+        setTopics(topicData);
+
+        // Read category and topic IDs passed from the topic page.
+        const queryParams = new URLSearchParams(window.location.search);
+        const requestedCategoryId = queryParams.get("categoryId");
+        const requestedTopicId = queryParams.get("topicId");
+
+        const requestedTopic = topicData.find(
+          (topic) =>
+            topic.id === requestedTopicId &&
+            topic.category_id === requestedCategoryId
+        );
+
+        const requestedCategoryExists = categoryData.some(
+          (category) => category.id === requestedCategoryId
+        );
+
+        if (requestedTopic && requestedCategoryExists) {
+          setCategoryId(requestedCategoryId!);
+          setTopicId(requestedTopic.id);
+        }
+      } catch (err) {
+        console.error("Error loading categories/topics:", err);
         setMessage("Could not load categories and topics.");
         setMessageType("error");
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const categoryData = categoryResult.data ?? [];
-      const topicData = topicResult.data ?? [];
-
-      setCategories(categoryData);
-      setTopics(topicData);
-
-      // Read category and topic IDs passed from the topic page.
-      const queryParams = new URLSearchParams(window.location.search);
-      const requestedCategoryId = queryParams.get("categoryId");
-      const requestedTopicId = queryParams.get("topicId");
-
-      const requestedTopic = topicData.find(
-        (topic) =>
-          topic.id === requestedTopicId &&
-          topic.category_id === requestedCategoryId
-      );
-
-      const requestedCategoryExists = categoryData.some(
-        (category) => category.id === requestedCategoryId
-      );
-
-      if (requestedTopic && requestedCategoryExists) {
-        setCategoryId(requestedCategoryId!);
-        setTopicId(requestedTopic.id);
-      }
-
-      setLoading(false);
     }
 
     fetchData();
@@ -157,55 +161,98 @@ export default function NewArticlePage() {
 
     setSaving(true);
 
-    const { data: userData, error: userError } =
-      await supabase.auth.getUser();
+    try {
+      // Verify the current user session.
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
 
-    if (userError || !userData.user) {
-      setMessage("Your session has expired. Please log in again.");
-      setMessageType("error");
-      setSaving(false);
-      router.replace("/admin/login");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("articles")
-      .insert({
-        title: title.trim(),
-        slug,
-        topic_id: topicId,
-        content,
-        status,
-      });
-
-    setSaving(false);
-
-    if (error) {
-      console.error("Article save failed:", error);
-
-      if (error.code === "23505") {
-        setMessage("This URL slug already exists. Please change the title.");
-      } else if (error.code === "42501") {
-        setMessage("Permission denied. Check your admin RLS policies.");
-      } else {
-        setMessage("Could not save article: " + error.message);
+      if (userError || !userData.user) {
+        setMessage("Your session has expired. Please log in again.");
+        setMessageType("error");
+        router.replace("/admin/login");
+        return;
       }
 
+      // Verify that the current user is the admin.
+      if (userData.user.id !== ADMIN_ID) {
+        setMessage("You do not have permission to create articles.");
+        setMessageType("error");
+        return;
+      }
+
+      // Generate a unique slug if the title already exists.
+      let uniqueSlug = slug;
+      let attempt = 1;
+      let saved = false;
+      let saveError: { code?: string; message: string } | null = null;
+
+      while (attempt <= 100) {
+        const { error } = await supabase
+          .from("articles")
+          .insert({
+            title: title.trim(),
+            slug: uniqueSlug,
+            topic_id: topicId,
+            content,
+            status,
+          });
+
+        if (!error) {
+          saved = true;
+          break;
+        }
+
+        // A duplicate slug means we should try another one.
+        if (error.code === "23505") {
+          attempt++;
+          uniqueSlug = `${slug}-${attempt}`;
+          continue;
+        }
+
+        saveError = error;
+        break;
+      }
+
+      if (!saved) {
+        if (saveError) {
+          console.error("Article save failed:", {
+            message: saveError.message,
+            code: saveError.code,
+          });
+
+          if (saveError.code === "42501") {
+            setMessage("Permission denied. Check your admin RLS policies.");
+          } else {
+            setMessage("Could not save article: " + saveError.message);
+          }
+        } else {
+          setMessage(
+            "Could not generate a unique URL slug. Please try another title."
+          );
+        }
+
+        setMessageType("error");
+        return;
+      }
+
+      setMessage(
+        status === "draft"
+          ? `Article saved successfully as a draft! URL: ${uniqueSlug}`
+          : `Article published successfully! URL: ${uniqueSlug}`
+      );
+      setMessageType("success");
+
+      if (status === "published") {
+        setTimeout(() => {
+          router.push(`/articles/${uniqueSlug}`);
+        }, 1200);
+      }
+    } catch (err) {
+      console.error("Unexpected article save error:", err);
+      setMessage("An unexpected error occurred while saving the article.");
       setMessageType("error");
-      return;
-    }
-
-    setMessage(
-      status === "draft"
-        ? "Article saved successfully as a draft!"
-        : "Article published successfully!"
-    );
-    setMessageType("success");
-
-    if (status === "published") {
-      setTimeout(() => {
-        router.push(`/articles/${slug}`);
-      }, 1200);
+    } finally {
+      setSaving(false);
     }
   }
 
