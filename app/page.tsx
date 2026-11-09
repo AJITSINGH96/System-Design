@@ -316,7 +316,7 @@ export default function Home() {
                       type="button"
                       onClick={handleLogout}
                       disabled={loggingOut}
-                      className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="cursor-pointer rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {loggingOut ? "Logging out..." : "Logout"}
                     </button>
@@ -336,7 +336,7 @@ export default function Home() {
       type="button"
       onClick={handleLogout}
       disabled={loggingOut}
-      className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-gray-800 hover:text-white disabled:opacity-60"
+      className="cursor-pointer rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-gray-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
     >
       {loggingOut ? "Logging out..." : "Logout"}
     </button>
