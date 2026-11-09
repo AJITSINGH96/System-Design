@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -10,6 +11,8 @@ type CommunityArticle = {
   title: string;
   slug: string;
   description: string | null;
+  category_id: string | null;
+  topic_id: string | null;
   created_at: string;
 };
 
@@ -20,11 +23,23 @@ type PublicProfile = {
   avatar_url: string | null;
 };
 
+type Category = {
+  id: string;
+  name: string;
+};
+
+type Topic = {
+  id: string;
+  title: string;
+};
+
 export default function CommunityPage() {
   const [supabase] = useState(() => createClient());
 
   const [articles, setArticles] = useState<CommunityArticle[]>([]);
   const [profiles, setProfiles] = useState<Record<string, PublicProfile>>({});
+  const [categories, setCategories] = useState<Record<string, Category>>({});
+  const [topics, setTopics] = useState<Record<string, Topic>>({});
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -36,7 +51,9 @@ export default function CommunityPage() {
     try {
       const { data: articleData, error: articleError } = await supabase
         .from("user_articles")
-        .select("id, user_id, title, slug, description, created_at")
+        .select(
+          "id, user_id, title, slug, description, category_id, topic_id, created_at"
+        )
         .eq("status", "published")
         .eq("visibility", "public")
         .order("created_at", { ascending: false })
@@ -51,25 +68,67 @@ export default function CommunityPage() {
         ...new Set(loadedArticles.map((article) => article.user_id)),
       ];
 
-      if (userIds.length === 0) {
-        setProfiles({});
-        return;
-      }
+      const categoryIds = [
+        ...new Set(
+          loadedArticles
+            .map((article) => article.category_id)
+            .filter((id): id is string => Boolean(id))
+        ),
+      ];
 
-      const { data: profileData, error: profileError } = await supabase
-        .from("user_profiles")
-        .select("id, username, display_name, avatar_url")
-        .in("id", userIds);
+      const topicIds = [
+        ...new Set(
+          loadedArticles
+            .map((article) => article.topic_id)
+            .filter((id): id is string => Boolean(id))
+        ),
+      ];
 
-      if (profileError) throw profileError;
+      const [profileResult, categoryResult, topicResult] =
+        await Promise.all([
+          userIds.length
+            ? supabase
+                .from("user_profiles")
+                .select("id, username, display_name, avatar_url")
+                .in("id", userIds)
+            : Promise.resolve({ data: [], error: null }),
+
+          categoryIds.length
+            ? supabase
+                .from("user_categories")
+                .select("id, name")
+                .in("id", categoryIds)
+            : Promise.resolve({ data: [], error: null }),
+
+          topicIds.length
+            ? supabase
+                .from("user_topics")
+                .select("id, title")
+                .in("id", topicIds)
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+
+      if (profileResult.error) throw profileResult.error;
+      if (categoryResult.error) throw categoryResult.error;
+      if (topicResult.error) throw topicResult.error;
 
       const profileMap: Record<string, PublicProfile> = {};
-
-      (profileData ?? []).forEach((profile) => {
+      (profileResult.data ?? []).forEach((profile) => {
         profileMap[profile.id] = profile as PublicProfile;
       });
-
       setProfiles(profileMap);
+
+      const categoryMap: Record<string, Category> = {};
+      (categoryResult.data ?? []).forEach((category) => {
+        categoryMap[category.id] = category as Category;
+      });
+      setCategories(categoryMap);
+
+      const topicMap: Record<string, Topic> = {};
+      (topicResult.data ?? []).forEach((topic) => {
+        topicMap[topic.id] = topic as Topic;
+      });
+      setTopics(topicMap);
     } catch (err) {
       console.error("Community loading error:", err);
       setError("Unable to load Community. Please try again.");
@@ -89,15 +148,23 @@ export default function CommunityPage() {
 
     return articles.filter((article) => {
       const profile = profiles[article.user_id];
+      const category = article.category_id
+        ? categories[article.category_id]
+        : undefined;
+      const topic = article.topic_id
+        ? topics[article.topic_id]
+        : undefined;
 
       return (
         article.title.toLowerCase().includes(term) ||
         (article.description ?? "").toLowerCase().includes(term) ||
         (profile?.display_name ?? "").toLowerCase().includes(term) ||
-        (profile?.username ?? "").toLowerCase().includes(term)
+        (profile?.username ?? "").toLowerCase().includes(term) ||
+        (category?.name ?? "").toLowerCase().includes(term) ||
+        (topic?.title ?? "").toLowerCase().includes(term)
       );
     });
-  }, [articles, profiles, search]);
+  }, [articles, profiles, categories, topics, search]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -142,12 +209,12 @@ export default function CommunityPage() {
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search articles or authors..."
+            placeholder="Search articles, authors, categories or topics..."
             className="w-full rounded-xl border border-gray-700 bg-gray-900 px-5 py-4 text-white outline-none focus:border-blue-500"
           />
 
           <p className="mt-2 text-sm text-gray-500">
-            Search by article title, description, author name, or username.
+            Search by article title, description, author, category or topic.
           </p>
         </div>
 
@@ -196,6 +263,14 @@ export default function CommunityPage() {
               {filteredArticles.map((article) => {
                 const profile = profiles[article.user_id];
 
+                const category = article.category_id
+                  ? categories[article.category_id]
+                  : undefined;
+
+                const topic = article.topic_id
+                  ? topics[article.topic_id]
+                  : undefined;
+
                 return (
                   <article
                     key={article.id}
@@ -208,6 +283,28 @@ export default function CommunityPage() {
                       <h3 className="text-xl font-semibold leading-snug group-hover:text-blue-400">
                         {article.title}
                       </h3>
+
+                      {(category || topic) && (
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                          {category && (
+                            <span>
+                              Category:{" "}
+                              <span className="font-medium text-blue-300">
+                                {category.name}
+                              </span>
+                            </span>
+                          )}
+
+                          {topic && (
+                            <span>
+                              Topic:{" "}
+                              <span className="font-medium text-purple-300">
+                                {topic.title}
+                              </span>
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {article.description && (
                         <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-400">

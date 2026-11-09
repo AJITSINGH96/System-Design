@@ -30,6 +30,7 @@ function PublicProfileContent() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -37,6 +38,11 @@ function PublicProfileContent() {
     async function loadProfile() {
       setLoading(true);
       setError("");
+
+      // Check whether the logged-in user owns this profile.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
       const { data: profileData, error: profileError } = await supabase
         .from("user_profiles")
@@ -59,6 +65,7 @@ function PublicProfileContent() {
       }
 
       setProfile(profileData);
+      setIsOwnProfile(user?.id === profileData.id);
 
       const { data: articleData, error: articleError } = await supabase
         .from("user_articles")
@@ -96,17 +103,20 @@ function PublicProfileContent() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-gray-950 px-6 text-center text-gray-100">
         <div className="text-5xl">👤</div>
+
         <h1 className="mt-5 text-2xl font-bold">
           Profile not found
         </h1>
+
         <p className="mt-2 text-gray-400">
           This user profile may not exist.
         </p>
+
         <Link
           href="/community"
           className="mt-6 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold hover:bg-blue-500"
         >
-          Explore Community
+          ← Back to Community
         </Link>
       </div>
     );
@@ -120,12 +130,21 @@ function PublicProfileContent() {
             System Design <span className="text-blue-400">Hub</span>
           </Link>
 
-          <Link
-            href="/community"
-            className="text-sm text-blue-400 hover:text-blue-300"
-          >
-            Community
-          </Link>
+          {isOwnProfile ? (
+            <Link
+              href="/my-space"
+              className="rounded-lg border border-gray-700 px-4 py-2 text-sm text-blue-400 transition hover:border-blue-500 hover:bg-gray-800"
+            >
+              ← Back to My Space
+            </Link>
+          ) : (
+            <Link
+              href="/community"
+              className="rounded-lg border border-gray-700 px-4 py-2 text-sm text-blue-400 transition hover:border-blue-500 hover:bg-gray-800"
+            >
+              ← Back to Community
+            </Link>
+          )}
         </div>
       </header>
 

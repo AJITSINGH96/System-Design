@@ -25,10 +25,7 @@ export default function ArticleEditor({
 }: ArticleEditorProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Remember the article cursor position.
   const diagramPositionRef = useRef<number>(0);
-
-  // Remember the browser tab opened for diagram editing.
   const diagramWindowRef = useRef<Window | null>(null);
 
   const editor = useEditor({
@@ -155,13 +152,9 @@ export default function ArticleEditor({
   function openNewDiagram() {
     if (!editor) return;
 
-    // Save the current cursor position.
     diagramPositionRef.current = editor.state.selection.from;
 
-    const newTab = window.open(
-      "/diagram-editor",
-      "_blank"
-    );
+    const newTab = window.open("/diagram-editor", "_blank");
 
     if (!newTab) {
       alert("Please allow pop-ups for this website.");
@@ -171,7 +164,7 @@ export default function ArticleEditor({
     diagramWindowRef.current = newTab;
   }
 
-  // Upload article image.
+  // Upload article image into the current user's own folder.
   async function uploadImage(file: File) {
     if (!editor) return;
 
@@ -189,8 +182,21 @@ export default function ArticleEditor({
 
     const supabase = createClient();
 
+    // Get the currently authenticated user.
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      alert("Please log in before uploading an image.");
+      return;
+    }
+
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-");
-    const filePath = `${crypto.randomUUID()}-${safeName}`;
+
+    // Store the image inside the user's own folder.
+    const filePath = `${user.id}/${crypto.randomUUID()}-${safeName}`;
 
     const { error } = await supabase.storage
       .from("article-images")

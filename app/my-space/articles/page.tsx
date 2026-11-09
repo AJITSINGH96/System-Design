@@ -211,6 +211,12 @@ export default function MyArticlesPage() {
                     </span>
 
                     <Link
+                      href={`/my-space/articles/${article.id}/view`}
+                      className="rounded-lg border border-green-800 px-3 py-2 text-xs text-green-400 hover:bg-green-950/50"
+                    >
+                      View
+                    </Link>
+                    <Link
                       href={`/my-space/articles/${article.id}/edit`}
                       className="rounded-lg border border-blue-800 px-3 py-2 text-xs text-blue-400 hover:bg-blue-950/50"
                     >

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -25,6 +25,7 @@ type Article = {
 export default function MySpacePage() {
   const router = useRouter();
   const [supabase] = useState(() => createClient());
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
@@ -37,7 +38,9 @@ export default function MySpacePage() {
 
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [error, setError] = useState("");
+  const [avatarMessage, setAvatarMessage] = useState("");
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -149,6 +152,109 @@ export default function MySpacePage() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+  useEffect(() => {
+  if (!avatarMessage) return;
+
+  const timeoutId = window.setTimeout(() => {
+    setAvatarMessage("");
+  }, 4000);
+
+  return () => {
+    window.clearTimeout(timeoutId);
+  };
+}, [avatarMessage]);
+
+  
+async function handleAvatarUpload(
+  event: React.ChangeEvent<HTMLInputElement>
+) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+
+  if (!file) return;
+
+  setError("");
+  setAvatarMessage("");
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  if (!allowedTypes.includes(file.type)) {
+    setAvatarMessage("Please select a PNG, JPG, JPEG or WebP image.");
+    return;
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    setAvatarMessage("Image size must be 2 MB or less.");
+    return;
+  }
+
+  setUploadingAvatar(true);
+
+  try {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new Error("Your session has expired. Please log in again.");
+    }
+
+    const extensionByType: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+    };
+
+    const filePath = `${user.id}/${crypto.randomUUID()}.${extensionByType[file.type]}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = supabase.storage
+      .from("avatars")
+      .getPublicUrl(filePath);
+
+    const avatarUrl = `${publicUrlData.publicUrl}?t=${Date.now()}`;
+
+    const { error: updateError } = await supabase
+      .from("user_profiles")
+      .update({ avatar_url: avatarUrl })
+      .eq("id", user.id);
+
+    if (updateError) {
+      // Remove the newly uploaded file if profile update fails.
+      await supabase.storage.from("avatars").remove([filePath]);
+      throw updateError;
+    }
+
+    setProfile((current) =>
+      current
+        ? { ...current, avatar_url: avatarUrl }
+        : current
+    );
+
+    setAvatarMessage("Profile picture updated successfully.");
+  } catch (err) {
+    console.error("Avatar upload error:", err);
+
+    setAvatarMessage(
+      err instanceof Error
+        ? err.message
+        : "Unable to upload your profile picture. Please try again."
+    );
+  } finally {
+    setUploadingAvatar(false);
+  }
+}
+
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -210,9 +316,13 @@ export default function MySpacePage() {
           </Link>
 
           <div className="flex items-center gap-4">
-            <span className="hidden text-sm text-gray-400 sm:block">
+            <Link
+              href="/my-space/profile"
+              className="text-sm text-gray-400 transition hover:text-blue-400"
+              title="View and edit your profile"
+            >
               {profile?.display_name}
-            </span>
+            </Link>
 
             <button
               onClick={handleLogout}
@@ -226,6 +336,132 @@ export default function MySpacePage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10">
+        {/* Community Profile */}
+        <section className="mb-10 rounded-xl border border-gray-800 bg-gray-900 p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              {/* Profile picture with upload button */}
+              <div className="relative h-20 w-20 shrink-0">
+                {profile?.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt="Profile picture"
+                    className="h-20 w-20 rounded-full border border-gray-700 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full border border-gray-700 bg-blue-600/20 text-2xl font-bold text-blue-400">
+                    {profile?.display_name?.charAt(0).toUpperCase() || "U"}
+                  </div>
+                )}
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                  aria-label="Choose profile picture"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  title="Change profile picture"
+                  aria-label="Change profile picture"
+                  className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-900 bg-blue-600 text-white shadow-lg transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {uploadingAvatar ? (
+                    <svg
+                      className="h-4 w-4 animate-spin"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        className="opacity-30"
+                      />
+                      <path
+                        d="M21 12a9 9 0 0 0-9-9"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-4 w-4"
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold">
+                  {profile?.display_name}
+                </h2>
+
+                <p className="mt-1 text-sm text-blue-400">
+                  @{profile?.username}
+                </p>
+
+                <p className="mt-2 text-sm text-gray-400">
+                  {profile?.bio ||
+                    "Add a bio to introduce yourself to the community."}
+                </p>
+
+                {avatarMessage && (
+                  <p
+                    className={`mt-2 text-xs ${
+                      avatarMessage.includes("successfully")
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                    role="status"
+                  >
+                    {avatarMessage}
+                  </p>
+                )}
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Click the pencil icon to change your picture.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href={`/users/${encodeURIComponent(profile?.username ?? "")}`}
+                className="inline-flex items-center justify-center rounded-lg border border-gray-700 px-5 py-3 text-sm font-medium transition hover:border-blue-500 hover:bg-gray-800"
+              >
+                View Profile
+              </Link>
+
+              <Link
+                href="/my-space/profile"
+                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500"
+              >
+                Edit Profile
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* Welcome */}
         <div className="mb-10">
           <p className="text-sm font-medium text-blue-400">
             PERSONAL WORKSPACE
@@ -257,6 +493,47 @@ export default function MySpacePage() {
         )}
 
         {/* Statistics */}
+        
+
+        {/* Content management */}
+        <section className="mt-12">
+          <h2 className="mb-4 text-lg font-semibold">
+            Manage your content
+          </h2>
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            {managementCards.map((card) => (
+              <Link
+                key={card.href}
+                href={card.href}
+                className="group block rounded-xl border border-gray-800 bg-gray-900 p-6 transition duration-200 hover:-translate-y-1 hover:border-blue-500 hover:bg-gray-800/80 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <div className="text-2xl">
+                  {card.icon}
+                </div>
+
+                <h3 className="mt-4 text-lg font-semibold group-hover:text-blue-400">
+                  {card.title}
+                </h3>
+
+                <p className="mt-2 text-sm text-gray-400">
+                  {card.description}
+                </p>
+
+                <p className="mt-4 text-sm text-gray-500">
+                  {card.count}
+                </p>
+
+                <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-blue-400">
+                  Manage
+                  <span className="transition-transform group-hover:translate-x-1">
+                    →
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
         <section>
           <h2 className="mb-4 text-lg font-semibold">
             Workspace overview
@@ -302,46 +579,6 @@ export default function MySpacePage() {
                   {item.value}
                 </p>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* Content management */}
-        <section className="mt-12">
-          <h2 className="mb-4 text-lg font-semibold">
-            Manage your content
-          </h2>
-
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-            {managementCards.map((card) => (
-              <Link
-                key={card.href}
-                href={card.href}
-                className="group block rounded-xl border border-gray-800 bg-gray-900 p-6 transition duration-200 hover:-translate-y-1 hover:border-blue-500 hover:bg-gray-800/80 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <div className="text-2xl">
-                  {card.icon}
-                </div>
-
-                <h3 className="mt-4 text-lg font-semibold group-hover:text-blue-400">
-                  {card.title}
-                </h3>
-
-                <p className="mt-2 text-sm text-gray-400">
-                  {card.description}
-                </p>
-
-                <p className="mt-4 text-sm text-gray-500">
-                  {card.count}
-                </p>
-
-                <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-blue-400">
-                  Manage
-                  <span className="transition-transform group-hover:translate-x-1">
-                    →
-                  </span>
-                </span>
-              </Link>
             ))}
           </div>
         </section>
@@ -404,32 +641,6 @@ export default function MySpacePage() {
               ))}
             </div>
           )}
-        </section>
-
-        {/* Profile */}
-        <section className="mt-12 rounded-xl border border-gray-800 bg-gray-900 p-6">
-          <h2 className="text-lg font-semibold">
-            Your community profile
-          </h2>
-
-          <p className="mt-2 text-sm text-gray-400">
-            Your public profile will let other community members discover
-            your published articles.
-          </p>
-
-          <p className="mt-4 text-sm text-blue-400">
-            @{profile?.username}
-          </p>
-
-          {profile?.bio && (
-            <p className="mt-2 text-sm text-gray-400">
-              {profile.bio}
-            </p>
-          )}
-
-          <span className="mt-4 inline-block text-xs text-gray-500">
-            Public profile page coming next
-          </span>
         </section>
       </main>
     </div>
