@@ -40,6 +40,8 @@ export default function CommunityPage() {
   const [profiles, setProfiles] = useState<Record<string, PublicProfile>>({});
   const [categories, setCategories] = useState<Record<string, Category>>({});
   const [topics, setTopics] = useState<Record<string, Topic>>({});
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -129,6 +131,43 @@ export default function CommunityPage() {
         topicMap[topic.id] = topic as Topic;
       });
       setTopics(topicMap);
+
+      // Load likes and comments for all listed articles
+      const articleIds = loadedArticles.map((article) => article.id);
+
+      if (articleIds.length > 0) {
+        const [likesResult, commentsResult] = await Promise.all([
+          supabase
+            .from("article_likes")
+            .select("article_id")
+            .in("article_id", articleIds),
+
+          supabase
+            .from("article_comments")
+            .select("article_id")
+            .in("article_id", articleIds),
+        ]);
+
+        if (likesResult.error) throw likesResult.error;
+        if (commentsResult.error) throw commentsResult.error;
+
+        const likesMap: Record<string, number> = {};
+        (likesResult.data ?? []).forEach((like) => {
+          likesMap[like.article_id] =
+            (likesMap[like.article_id] ?? 0) + 1;
+        });
+        setLikeCounts(likesMap);
+
+        const commentsMap: Record<string, number> = {};
+        (commentsResult.data ?? []).forEach((comment) => {
+          commentsMap[comment.article_id] =
+            (commentsMap[comment.article_id] ?? 0) + 1;
+        });
+        setCommentCounts(commentsMap);
+      } else {
+        setLikeCounts({});
+        setCommentCounts({});
+      }
     } catch (err) {
       console.error("Community loading error:", err);
       setError("Unable to load Community. Please try again.");
@@ -271,6 +310,9 @@ export default function CommunityPage() {
                   ? topics[article.topic_id]
                   : undefined;
 
+                const likes = likeCounts[article.id] ?? 0;
+                const comments = commentCounts[article.id] ?? 0;
+
                 return (
                   <article
                     key={article.id}
@@ -317,7 +359,46 @@ export default function CommunityPage() {
                       </span>
                     </Link>
 
-                    <div className="mt-6 flex items-center justify-between gap-3 border-t border-gray-800 pt-4">
+                    {/* Article engagement counts */}
+                    <div className="mt-4 flex items-center gap-5 text-sm text-gray-400">
+                      <span className="inline-flex items-center gap-1.5">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          className="h-4 w-4"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"
+                          />
+                        </svg>
+                        {likes} {likes === 1 ? "like" : "likes"}
+                      </span>
+
+                      <span className="inline-flex items-center gap-1.5">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          className="h-4 w-4"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"
+                          />
+                        </svg>
+                        {comments} {comments === 1 ? "comment" : "comments"}
+                      </span>
+                    </div>
+
+                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-gray-800 pt-4">
                       {profile ? (
                         <Link
                           href={`/users/${encodeURIComponent(profile.username)}`}

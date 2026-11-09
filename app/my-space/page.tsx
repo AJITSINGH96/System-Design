@@ -35,6 +35,7 @@ export default function MySpacePage() {
   const [articleCount, setArticleCount] = useState(0);
   const [draftCount, setDraftCount] = useState(0);
   const [publishedCount, setPublishedCount] = useState(0);
+  const [bookmarkCount, setBookmarkCount] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -83,6 +84,7 @@ export default function MySpacePage() {
         articlesResult,
         draftsResult,
         publishedResult,
+        bookmarkCountResult,
         recentArticlesResult,
       ] = await Promise.all([
         supabase
@@ -111,7 +113,10 @@ export default function MySpacePage() {
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
           .eq("status", "published"),
-
+        supabase
+          .from("article_bookmarks")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id),
         supabase
           .from("user_articles")
           .select("id, title, slug, status, visibility, updated_at")
@@ -126,6 +131,7 @@ export default function MySpacePage() {
         articlesResult,
         draftsResult,
         publishedResult,
+        bookmarkCountResult,
         recentArticlesResult,
       ];
 
@@ -140,6 +146,7 @@ export default function MySpacePage() {
       setArticleCount(articlesResult.count ?? 0);
       setDraftCount(draftsResult.count ?? 0);
       setPublishedCount(publishedResult.count ?? 0);
+      setBookmarkCount(bookmarkCountResult.count ?? 0);
       setArticles(recentArticlesResult.data ?? []);
     } catch (err) {
       console.error("Dashboard loading error:", err);
@@ -281,31 +288,39 @@ async function handleAvatarUpload(
   }
 
   const managementCards = [
-    {
-      href: "/my-space/categories",
-      icon: "📁",
-      title: "My Categories",
-      description:
-        "Organize your knowledge base into your own categories.",
-      count: `${categoryCount} categories`,
-    },
-    {
-      href: "/my-space/topics",
-      icon: "🗂️",
-      title: "My Topics",
-      description:
-        "Group related system design articles into topics.",
-      count: `${topicCount} topics`,
-    },
-    {
-      href: "/my-space/articles",
-      icon: "📝",
-      title: "My Articles",
-      description:
-        "Write, edit and publish your own system design articles.",
-      count: `${articleCount} articles`,
-    },
-  ];
+  {
+    href: "/my-space/categories",
+    icon: "📁",
+    title: "My Categories",
+    description:
+      "Organize your knowledge base into your own categories.",
+    count: `${categoryCount} categories`,
+  },
+  {
+    href: "/my-space/topics",
+    icon: "🗂️",
+    title: "My Topics",
+    description:
+      "Group related system design articles into topics.",
+    count: `${topicCount} topics`,
+  },
+  {
+    href: "/my-space/articles",
+    icon: "📝",
+    title: "My Articles",
+    description:
+      "Write, edit and publish your own system design articles.",
+    count: `${articleCount} articles`,
+  },
+  {
+    href: "/my-space/bookmarks",
+    icon: "🔖",
+    title: "My Bookmarks",
+    description:
+      "Access the public community articles you have saved.",
+    count: `${bookmarkCount} bookmarks`,
+  },
+];
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -501,7 +516,7 @@ async function handleAvatarUpload(
             Manage your content
           </h2>
 
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
             {managementCards.map((card) => (
               <Link
                 key={card.href}

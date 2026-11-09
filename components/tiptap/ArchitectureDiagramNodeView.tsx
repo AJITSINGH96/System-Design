@@ -19,11 +19,13 @@ export default function ArchitectureDiagramNodeView({
   const diagram = node.attrs.diagram as ArchitectureDiagramData;
 
   function editDiagram() {
+    // Extra protection: never edit from a read-only editor.
+    if (!editor.isEditable) return;
+
     const position = getPos();
 
     if (typeof position !== "number") return;
 
-    // Keep a separately typed, validated position for callbacks.
     const diagramPosition: number = position;
 
     const newTab = window.open("/diagram-editor?mode=edit", "_blank");
@@ -33,7 +35,6 @@ export default function ArchitectureDiagramNodeView({
       return;
     }
 
-    // Use this non-null alias inside the event handler.
     const editorWindow = newTab;
 
     function handleMessage(event: MessageEvent) {
@@ -51,6 +52,12 @@ export default function ArchitectureDiagramNodeView({
       }
 
       if (event.data?.type === "ARCHITECTURE_DIAGRAM_UPDATED") {
+        // Check again before modifying the document.
+        if (!editor.isEditable) {
+          window.removeEventListener("message", handleMessage);
+          return;
+        }
+
         const updatedDiagram =
           event.data.diagram as ArchitectureDiagramData;
 
@@ -80,6 +87,9 @@ export default function ArchitectureDiagramNodeView({
   }
 
   function deleteDiagram() {
+    // Extra protection: never delete from a read-only editor.
+    if (!editor.isEditable) return;
+
     const position = getPos();
 
     if (typeof position !== "number") return;
@@ -103,23 +113,25 @@ export default function ArchitectureDiagramNodeView({
   return (
     <NodeViewWrapper className="my-6">
       <div contentEditable={false}>
-        <div className="mb-3 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={editDiagram}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
-            Edit Diagram
-          </button>
+        {editor.isEditable && (
+          <div className="mb-3 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={editDiagram}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Edit Diagram
+            </button>
 
-          <button
-            type="button"
-            onClick={deleteDiagram}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-          >
-            Delete Diagram
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={deleteDiagram}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Delete Diagram
+            </button>
+          </div>
+        )}
 
         {diagram?.nodes?.length > 0 ? (
           <ArchitectureDiagramViewer diagram={diagram} />

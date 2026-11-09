@@ -31,7 +31,8 @@ export default function AllArticlesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
-    async function deleteArticle(articleId: string) {
+
+  async function deleteArticle(articleId: string) {
     const confirmed = window.confirm(
       "Are you sure you want to permanently delete this article?"
     );
@@ -103,7 +104,8 @@ export default function AllArticlesPage() {
     () =>
       Array.from(
         new Set(
-          articles.map((article) => article.topic?.category?.name)
+          articles
+            .map((article) => article.topic?.category?.name)
             .filter(Boolean)
         )
       ),
@@ -136,17 +138,21 @@ export default function AllArticlesPage() {
   ).length;
 
   return (
-    <main className="min-h-screen bg-gray-950 text-white p-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-gray-950 text-white">
 
-        <Link
-          href="/"
-          className="text-blue-400 hover:text-blue-300 text-sm"
-        >
-          ← Back to Home
-        </Link>
+      {/* Header */}
+      <header className="border-b border-gray-800 bg-gray-900/80">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <Link href="/" className="text-xl font-bold">
+            System Design <span className="text-blue-400">Hub</span>
+          </Link>
+        </div>
+      </header>
 
-        <div className="flex items-center justify-between mt-6 mb-2">
+      {/* Main content */}
+      <main className="mx-auto max-w-5xl p-8">
+
+        <div className="flex items-center justify-between mt-2 mb-2">
           <h1 className="text-3xl font-bold">
             All Articles
           </h1>
@@ -176,7 +182,6 @@ export default function AllArticlesPage() {
 
         {/* Filters */}
         <div className="flex flex-wrap gap-3 mb-6">
-
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -205,86 +210,82 @@ export default function AllArticlesPage() {
               </option>
             ))}
           </select>
-
         </div>
 
-        
-{/* Article list */}
-{loading ? (
-  <p className="text-gray-400">Loading articles...</p>
-) : filteredArticles.length === 0 ? (
-  <p className="text-gray-400">
-    No matching articles found.
-  </p>
-) : (
-  <div className="grid gap-4">
-    {filteredArticles.map((article) => (
-      <div
-        key={article.id}
-        className="relative flex items-center justify-between gap-4 border border-gray-800 rounded-xl p-5 hover:border-blue-500 hover:bg-gray-900/50 transition"
-      >
-        <Link
-          href={
-            isAdmin
-              ? `/admin/articles/${article.id}/edit`
-              : `/articles/${article.slug}`
-          }
-          className="absolute inset-0 rounded-xl"
-          aria-label={`Open ${article.title}`}
-        />
-
-        <div className="flex-1 min-w-0 pointer-events-none">
-          <h2 className="text-xl font-semibold mb-2">
-            {article.title}
-          </h2>
-
-          <p className="text-sm text-gray-400">
-            {article.topic?.category?.name} ·{" "}
-            {article.topic?.title}
+        {/* Article list */}
+        {loading ? (
+          <p className="text-gray-400">Loading articles...</p>
+        ) : filteredArticles.length === 0 ? (
+          <p className="text-gray-400">
+            No matching articles found.
           </p>
+        ) : (
+          <div className="grid gap-4">
+            {filteredArticles.map((article) => (
+              <div
+                key={article.id}
+                className="relative flex items-center justify-between gap-4 border border-gray-800 rounded-xl p-5 hover:border-blue-500 hover:bg-gray-900/50 transition"
+              >
+                <Link
+                  href={
+                    isAdmin
+                      ? `/admin/articles/${article.id}/edit`
+                      : `/articles/${article.slug}`
+                  }
+                  className="absolute inset-0 rounded-xl"
+                  aria-label={`Open ${article.title}`}
+                />
 
-          <p className="text-xs text-gray-500 mt-3">
-            {new Date(article.created_at).toLocaleDateString()}
-          </p>
-        </div>
+                <div className="flex-1 min-w-0 pointer-events-none">
+                  <h2 className="text-xl font-semibold mb-2">
+                    {article.title}
+                  </h2>
 
-        <div className="flex items-center gap-3 shrink-0 pointer-events-none">
-          <span
-            className={`px-3 py-1 rounded-full text-xs font-medium ${
-              article.status === "published"
-                ? "bg-green-900/50 text-green-400"
-                : "bg-yellow-900/50 text-yellow-400"
-            }`}
-          >
-            {article.status === "published"
-              ? "Published"
-              : "Draft"}
-          </span>
-        </div>
+                  <p className="text-sm text-gray-400">
+                    {article.topic?.category?.name} ·{" "}
+                    {article.topic?.title}
+                  </p>
 
-        {isAdmin && (
-          <div className="relative z-10 flex items-center gap-2">
-            <Link
-              href={`/admin/articles/${article.id}/edit`}
-              className="px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"
-            >
-              Edit
-            </Link>
+                  <p className="text-xs text-gray-500 mt-3">
+                    {new Date(article.created_at).toLocaleDateString()}
+                  </p>
+                </div>
 
-            <button
-              onClick={() => deleteArticle(article.id)}
-              className="px-3 py-1.5 rounded-lg border border-red-800 text-red-400 hover:bg-red-950 text-sm"
-            >
-              Delete
-            </button>
+                <div className="flex items-center gap-3 shrink-0 pointer-events-none">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      article.status === "published"
+                        ? "bg-green-900/50 text-green-400"
+                        : "bg-yellow-900/50 text-yellow-400"
+                    }`}
+                  >
+                    {article.status === "published"
+                      ? "Published"
+                      : "Draft"}
+                  </span>
+                </div>
+
+                {isAdmin && (
+                  <div className="relative z-10 flex items-center gap-2">
+                    <Link
+                      href={`/admin/articles/${article.id}/edit`}
+                      className="px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"
+                    >
+                      Edit
+                    </Link>
+
+                    <button
+                      onClick={() => deleteArticle(article.id)}
+                      className="px-3 py-1.5 rounded-lg border border-red-800 text-red-400 hover:bg-red-950 text-sm"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
-      </div>
-    ))}
-  </div>
-)}
-
-    
 
         {!loading && (
           <p className="text-xs text-gray-500 mt-5">
@@ -292,7 +293,7 @@ export default function AllArticlesPage() {
           </p>
         )}
 
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
