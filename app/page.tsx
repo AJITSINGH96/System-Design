@@ -405,6 +405,12 @@ export default function Home() {
                 >
                   Explore Articles
                 </Link>
+                <Link
+                  href="/my-space/articles/new"
+                  className="rounded-xl border border-gray-700 bg-gray-900 px-7 py-3.5 text-sm font-semibold text-gray-200 transition hover:border-gray-500 hover:bg-gray-800"
+                >
+                  + Create Article
+                </Link>
               </div>
 
               <div className="mt-12 flex flex-wrap gap-8 border-t border-gray-800 pt-7">
