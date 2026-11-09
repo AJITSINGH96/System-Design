@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import NotificationBell from "@/components/NotificationBell";
 
 type Profile = {
   username: string;
@@ -42,7 +43,6 @@ export default function MySpacePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [error, setError] = useState("");
   const [avatarMessage, setAvatarMessage] = useState("");
-
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -325,30 +325,32 @@ async function handleAvatarUpload(
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <header className="border-b border-gray-800 bg-gray-900/80">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-xl font-bold">
-            System Design <span className="text-blue-400">Hub</span>
-          </Link>
+  <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+    <Link href="/" className="text-xl font-bold">
+      System Design <span className="text-blue-400">Hub</span>
+    </Link>
 
-          <div className="flex items-center gap-4">
-            <Link
-              href="/my-space/profile"
-              className="text-sm text-gray-400 transition hover:text-blue-400"
-              title="View and edit your profile"
-            >
-              {profile?.display_name}
-            </Link>
+    <div className="flex items-center gap-4">
+      <Link
+        href="/my-space/profile"
+        className="text-sm text-gray-400 transition hover:text-blue-400"
+        title="View and edit your profile"
+      >
+        {profile?.display_name}
+      </Link>
 
-            <button
-              onClick={handleLogout}
-              disabled={loggingOut}
-              className="rounded-lg border border-gray-700 px-4 py-2 text-sm transition hover:bg-gray-800 disabled:opacity-50"
-            >
-              {loggingOut ? "Logging out..." : "Logout"}
-            </button>
-          </div>
-        </div>
-      </header>
+     <NotificationBell />
+
+      <button
+        onClick={handleLogout}
+        disabled={loggingOut}
+        className="rounded-lg border border-gray-700 px-4 py-2 text-sm transition hover:bg-gray-800 disabled:opacity-50"
+      >
+        {loggingOut ? "Logging out..." : "Logout"}
+      </button>
+    </div>
+  </div>
+</header>
 
       <main className="mx-auto max-w-7xl px-6 py-10">
         {/* Community Profile */}

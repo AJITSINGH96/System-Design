@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { createClient } from "@/lib/supabase/client";
+import NotificationBell from "@/components/NotificationBell";
 
 type Category = {
   id: string;
@@ -313,24 +314,26 @@ export default function Home() {
                       {loggingOut ? "Logging out..." : "Logout"}
                     </button>
                   </>
-                ) : isAuthenticated ? (
-                  <>
-                    <Link
-                      href="/my-space"
-                      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
-                    >
-                      My Space
-                    </Link>
+               ) : isAuthenticated ? (
+  <>
+    <Link
+      href="/my-space"
+      className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+    >
+      My Space
+    </Link>
 
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      disabled={loggingOut}
-                      className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-gray-800 hover:text-white disabled:opacity-60"
-                    >
-                      {loggingOut ? "Logging out..." : "Logout"}
-                    </button>
-                  </>
+    <NotificationBell />
+
+    <button
+      type="button"
+      onClick={handleLogout}
+      disabled={loggingOut}
+      className="rounded-lg border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-gray-800 hover:text-white disabled:opacity-60"
+    >
+      {loggingOut ? "Logging out..." : "Logout"}
+    </button>
+  </>
                 ) : (
                   <>
                     <Link
