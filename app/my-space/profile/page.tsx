@@ -429,6 +429,62 @@ export default function EditProfilePage() {
           onSubmit={handleSave}
           className="space-y-6 rounded-xl border border-gray-800 bg-gray-900 p-6"
         >
+           {/* Profile picture upload */}
+          <div className="border-t border-gray-800 pt-6">
+            <label className="mb-3 block text-sm font-medium">
+              Profile picture
+            </label>
+
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-700 bg-gray-950">
+                {currentAvatar ? (
+                  <img
+                    src={currentAvatar}
+                    alt="Profile preview"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-4xl font-bold text-gray-500">
+                    {profile.display_name.charAt(0).toUpperCase() || "?"}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <label className="inline-flex cursor-pointer items-center rounded-lg border border-gray-700 px-4 py-2.5 text-sm font-medium transition hover:bg-gray-800">
+                  {selectedFile ? "Choose another image" : "Upload image"}
+
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+
+                {currentAvatar && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveAvatar}
+                    className="ml-3 rounded-lg px-3 py-2.5 text-sm text-red-400 transition hover:bg-red-950/40"
+                  >
+                    Remove picture
+                  </button>
+                )}
+
+                <p className="text-xs text-gray-500">
+                  JPG, PNG or WebP. Maximum file size: 2 MB.
+                </p>
+
+                {selectedFile && (
+                  <p className="text-xs text-green-400">
+                    Selected: {selectedFile.name}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+          
           <div>
             <label className="mb-2 block text-sm font-medium">
               Display name
@@ -544,61 +600,6 @@ export default function EditProfilePage() {
             </div>
           </div>
 
-          {/* Profile picture upload */}
-          <div className="border-t border-gray-800 pt-6">
-            <label className="mb-3 block text-sm font-medium">
-              Profile picture
-            </label>
-
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gray-700 bg-gray-950">
-                {currentAvatar ? (
-                  <img
-                    src={currentAvatar}
-                    alt="Profile preview"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-4xl font-bold text-gray-500">
-                    {profile.display_name.charAt(0).toUpperCase() || "?"}
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-3">
-                <label className="inline-flex cursor-pointer items-center rounded-lg border border-gray-700 px-4 py-2.5 text-sm font-medium transition hover:bg-gray-800">
-                  {selectedFile ? "Choose another image" : "Upload image"}
-
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                </label>
-
-                {currentAvatar && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveAvatar}
-                    className="ml-3 rounded-lg px-3 py-2.5 text-sm text-red-400 transition hover:bg-red-950/40"
-                  >
-                    Remove picture
-                  </button>
-                )}
-
-                <p className="text-xs text-gray-500">
-                  JPG, PNG or WebP. Maximum file size: 2 MB.
-                </p>
-
-                {selectedFile && (
-                  <p className="text-xs text-green-400">
-                    Selected: {selectedFile.name}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
 
           {error && (
             <div className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-300">

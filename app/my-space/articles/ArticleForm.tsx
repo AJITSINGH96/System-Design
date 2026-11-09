@@ -259,8 +259,7 @@ export default function ArticleForm({ articleId }: ArticleFormProps) {
       );
 
       setTimeout(() => {
-        router.push("/my-space/articles");
-        router.refresh();
+        window.location.assign("/my-space/articles");
       }, 900);
     } catch (err) {
       console.error("Article save error:", err);
