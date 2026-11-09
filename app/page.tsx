@@ -289,8 +289,15 @@ export default function Home() {
 
             {!authLoading && (
               <>
-                {isAdmin ? (
+               {isAdmin ? (
                   <>
+                    <Link
+                      href="/admin/analytics"
+                      className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white transition hover:bg-gray-700"
+                    >
+                      Analytics
+                    </Link>
+
                     <Link
                       href="/admin/manage"
                       className="rounded-lg bg-gray-800 px-3 py-2 text-sm text-white transition hover:bg-gray-700"
