@@ -28,10 +28,16 @@ function ManageTopicsContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
+  // Add Topic form state
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+
+  // Inline editing state
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
 
   useEffect(() => {
     async function loadData() {
@@ -82,60 +88,99 @@ function ManageTopicsContent() {
       .replace(/^-|-$/g, "");
   }
 
-  function resetForm() {
-    setTitle("");
-    setDescription("");
-    setEditingId(null);
-  }
-
-  function startEditing(topic: Topic) {
-    setEditingId(topic.id);
-    setTitle(topic.title);
-    setDescription(topic.description ?? "");
-  }
-
-  async function saveTopic() {
-    if (!title.trim()) {
-      alert("Please enter a topic title.");
-      return;
-    }
-
-    setSaving(true);
-
-    const values = {
-      title: title.trim(),
-      slug: createSlug(title),
-      description: description.trim(),
-      category_id: categoryId,
-    };
-
-    const result = editingId
-      ? await supabase
-          .from("topics")
-          .update(values)
-          .eq("id", editingId)
-      : await supabase.from("topics").insert(values);
-
-    if (result.error) {
-      console.error("Save topic error:", result.error);
-      alert("Unable to save topic. Check whether the topic title already exists.");
-      setSaving(false);
-      return;
-    }
-
-    const { data, error: fetchError } = await supabase
+  async function refreshTopics() {
+    const { data, error } = await supabase
       .from("topics")
       .select("id, category_id, title, slug, description")
       .eq("category_id", categoryId)
       .order("title");
 
-    if (fetchError) {
+    if (error) {
       alert("Topic saved, but the list could not be refreshed.");
-    } else {
-      setTopics(data ?? []);
+      return false;
     }
 
-    resetForm();
+    setTopics(data ?? []);
+    return true;
+  }
+
+  function startEditing(topic: Topic) {
+    setEditingId(topic.id);
+    setEditTitle(topic.title);
+    setEditDescription(topic.description ?? "");
+    setMessage("");
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setEditTitle("");
+    setEditDescription("");
+  }
+
+  async function addTopic() {
+    if (!newTitle.trim()) {
+      alert("Please enter a topic title.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+
+    const { error } = await supabase.from("topics").insert({
+      title: newTitle.trim(),
+      slug: createSlug(newTitle),
+      description: newDescription.trim(),
+      category_id: categoryId,
+    });
+
+    if (error) {
+      console.error("Add topic error:", error);
+      alert("Unable to add topic. Check whether the topic title already exists.");
+      setSaving(false);
+      return;
+    }
+
+    setNewTitle("");
+    setNewDescription("");
+
+    await refreshTopics();
+
+    setMessage("Topic added successfully.");
+    setSaving(false);
+  }
+
+  async function saveTopic(topicId: string) {
+    if (!editTitle.trim()) {
+      alert("Please enter a topic title.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+
+    const { error } = await supabase
+      .from("topics")
+      .update({
+        title: editTitle.trim(),
+        slug: createSlug(editTitle),
+        description: editDescription.trim(),
+      })
+      .eq("id", topicId);
+
+    if (error) {
+      console.error("Update topic error:", error);
+      alert("Unable to update topic. Check whether the topic title already exists.");
+      setSaving(false);
+      return;
+    }
+
+    const refreshed = await refreshTopics();
+
+    if (refreshed) {
+      cancelEditing();
+      setMessage("Topic updated successfully.");
+    }
+
     setSaving(false);
   }
 
@@ -180,8 +225,10 @@ function ManageTopicsContent() {
     );
 
     if (editingId === topicId) {
-      resetForm();
+      cancelEditing();
     }
+
+    setMessage("Topic deleted successfully.");
   }
 
   if (loading) {
@@ -195,12 +242,11 @@ function ManageTopicsContent() {
   return (
     <main className="min-h-screen bg-gray-950 text-white p-8">
       <div className="max-w-4xl mx-auto">
-
         <Link
-          href="/"
+          href="/admin/manage"
           className="text-blue-400 hover:text-blue-300 text-sm"
         >
-          ← Back to Home
+          ← Back to Categories
         </Link>
 
         <h1 className="text-3xl font-bold mt-6 mb-2">
@@ -215,10 +261,10 @@ function ManageTopicsContent() {
           <p className="text-red-400 mb-5">{error}</p>
         )}
 
-        {/* Add / Edit Topic Form */}
-        <div className="border border-gray-800 rounded-xl p-6 mb-8">
+        {/* Add Topic Form */}
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
           <h2 className="text-xl font-semibold mb-5">
-            {editingId ? "Edit Topic" : "Add New Topic"}
+            Add New Topic
           </h2>
 
           <label className="block text-sm text-gray-400 mb-2">
@@ -226,10 +272,10 @@ function ManageTopicsContent() {
           </label>
 
           <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
             placeholder="e.g. Database Indexing"
-            className="w-full p-3 mb-4 rounded-lg bg-gray-900 border border-gray-700 outline-none focus:border-blue-500"
+            className="w-full p-3 mb-4 rounded-lg bg-gray-950 border border-gray-700 outline-none focus:border-blue-500"
           />
 
           <label className="block text-sm text-gray-400 mb-2">
@@ -237,72 +283,113 @@ function ManageTopicsContent() {
           </label>
 
           <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
             placeholder="Describe what this topic covers..."
             rows={3}
-            className="w-full p-3 mb-5 rounded-lg bg-gray-900 border border-gray-700 outline-none focus:border-blue-500"
+            className="w-full p-3 mb-5 rounded-lg bg-gray-950 border border-gray-700 outline-none focus:border-blue-500"
           />
 
-          <div className="flex gap-3">
-            <button
-              onClick={saveTopic}
-              disabled={saving}
-              className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-            >
-              {saving
-                ? "Saving..."
-                : editingId
-                  ? "Update Topic"
-                  : "Add Topic"}
-            </button>
-
-            {editingId && (
-              <button
-                onClick={resetForm}
-                className="px-5 py-2 rounded-lg bg-gray-700 hover:bg-gray-600"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
+          <button
+            onClick={addTopic}
+            disabled={saving}
+            className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-sm"
+          >
+            {saving ? "Saving..." : "Add Topic"}
+          </button>
         </div>
 
         {/* Existing Topics */}
-        <h2 className="text-xl font-semibold mb-4">
-          Existing Topics ({topics.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">
+            Existing Topics ({topics.length})
+          </h2>
+        </div>
+
+        {message && (
+          <p className="text-sm text-blue-400 mb-4">
+            {message}
+          </p>
+        )}
 
         <div className="space-y-3">
           {topics.map((topic) => (
             <div
               key={topic.id}
-              className="flex items-center justify-between gap-4 border border-gray-800 rounded-xl p-5"
+              className="border border-gray-800 rounded-xl p-5 bg-gray-900"
             >
-              <div className="min-w-0">
-                <h3 className="font-semibold">
-                  {topic.title}
-                </h3>
-                <p className="text-sm text-gray-400 mt-1">
-                  {topic.description}
-                </p>
-              </div>
+              {editingId === topic.id ? (
+                // Inline Edit Mode
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Topic Title
+                  </label>
 
-              <div className="flex gap-2 shrink-0">
-                <button
-                  onClick={() => startEditing(topic)}
-                  className="px-3 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"
-                >
-                  Edit
-                </button>
+                  <input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full p-3 mb-4 rounded-lg bg-gray-950 border border-gray-700 outline-none focus:border-blue-500"
+                  />
 
-                <button
-                  onClick={() => deleteTopic(topic.id)}
-                  className="px-3 py-2 rounded-lg border border-red-800 text-red-400 hover:bg-red-950 text-sm"
-                >
-                  Delete
-                </button>
-              </div>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Description
+                  </label>
+
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={3}
+                    className="w-full p-3 mb-4 rounded-lg bg-gray-950 border border-gray-700 outline-none focus:border-blue-500"
+                  />
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => saveTopic(topic.id)}
+                      disabled={saving}
+                      className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-sm"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+
+                    <button
+                      onClick={cancelEditing}
+                      disabled={saving}
+                      className="px-3.5 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Normal View
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold">
+                      {topic.title}
+                    </h3>
+
+                    <p className="text-sm text-gray-400 mt-1">
+                      {topic.description}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => startEditing(topic)}
+                      className="px-3 py-1.5 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => deleteTopic(topic.id)}
+                      className="px-3 py-1.5 rounded-lg border border-red-800 text-red-400 hover:bg-red-950 text-sm"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 

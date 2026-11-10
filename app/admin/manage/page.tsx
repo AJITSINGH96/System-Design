@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -77,16 +76,58 @@ export default function ManagePage() {
 
     const slug = createSlug(trimmedName);
 
-    const query = editingId
-      ? supabase
-          .from("categories")
-          .update({ name: trimmedName, slug })
-          .eq("id", editingId)
-      : supabase
-          .from("categories")
-          .insert({ name: trimmedName, slug });
+    const { error } = await supabase
+      .from("categories")
+      .update({ name: trimmedName, slug })
+      .eq("id", editingId);
 
-    const { error } = await query;
+    if (error) {
+      console.error(error);
+      setMessage(
+        error.code === "23505"
+          ? "A category with this name or slug already exists."
+          : error.message
+      );
+      setSaving(false);
+      return;
+    }
+
+    setEditingId(null);
+    setName("");
+    setMessage("Category updated successfully.");
+
+    await fetchCategories();
+    setSaving(false);
+  }
+
+  function startEditing(category: Category) {
+    setEditingId(category.id);
+    setName(category.name);
+    setMessage("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setName("");
+    setMessage("");
+  }
+
+  async function addCategory() {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      setMessage("Please enter a category name.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+
+    const slug = createSlug(trimmedName);
+
+    const { error } = await supabase
+      .from("categories")
+      .insert({ name: trimmedName, slug });
 
     if (error) {
       console.error(error);
@@ -100,17 +141,10 @@ export default function ManagePage() {
     }
 
     setName("");
-    setEditingId(null);
-    setMessage(editingId ? "Category updated!" : "Category added!");
+    setMessage("Category added successfully.");
 
     await fetchCategories();
     setSaving(false);
-  }
-
-  function editCategory(category: Category) {
-    setEditingId(category.id);
-    setName(category.name);
-    setMessage("");
   }
 
   async function deleteCategory(category: Category) {
@@ -153,13 +187,11 @@ export default function ManagePage() {
       previous.filter((item) => item.id !== category.id)
     );
 
-    setMessage("Category deleted.");
-  }
+    if (editingId === category.id) {
+      cancelEdit();
+    }
 
-  function cancelEdit() {
-    setEditingId(null);
-    setName("");
-    setMessage("");
+    setMessage("Category deleted.");
   }
 
   if (loading) {
@@ -173,7 +205,6 @@ export default function ManagePage() {
   return (
     <main className="min-h-screen bg-gray-950 text-white p-8">
       <div className="max-w-4xl mx-auto">
-
         <Link
           href="/"
           className="text-blue-400 hover:text-blue-300 text-sm"
@@ -189,82 +220,115 @@ export default function ManagePage() {
           Create, rename and organize your learning categories.
         </p>
 
+        {/* Add Category */}
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">
-            {editingId ? "Edit Category" : "Add New Category"}
+          <h2 className="text-lg font-semibold mb-4">
+            Add New Category
           </h2>
 
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Category name"
-            className="w-full p-3 rounded-lg bg-gray-950 border border-gray-700 outline-none focus:border-blue-500"
-          />
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              value={editingId ? "" : name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={!!editingId}
+              placeholder="e.g. Distributed Systems"
+              className="flex-1 min-w-0 p-3 rounded-lg bg-gray-950 border border-gray-700 outline-none focus:border-blue-500 disabled:opacity-40"
+            />
 
-          <div className="flex gap-3 mt-4">
             <button
-              onClick={saveCategory}
-              disabled={saving}
-              className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              onClick={addCategory}
+              disabled={saving || !!editingId}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
             >
-              {saving
-                ? "Saving..."
-                : editingId
-                  ? "Update Category"
-                  : "Add Category"}
+              {saving && !editingId ? "Adding..." : "Add Category"}
             </button>
-
-            {editingId && (
-              <button
-                onClick={cancelEdit}
-                className="px-5 py-2 rounded-lg bg-gray-700 hover:bg-gray-600"
-              >
-                Cancel
-              </button>
-            )}
           </div>
-
-          {message && (
-            <p className="text-sm text-blue-400 mt-4">
-              {message}
-            </p>
-          )}
         </div>
 
-        <h2 className="text-xl font-semibold mb-4">
-          Existing Categories ({categories.length})
-        </h2>
+        {message && (
+          <p className="text-sm text-blue-400 mb-5">
+            {message}
+          </p>
+        )}
 
-        <div className="grid gap-3">
+        {/* Existing Categories */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">
+            Existing Categories ({categories.length})
+          </h2>
+        </div>
+
+        <div className="space-y-3">
           {categories.map((category) => (
             <div
               key={category.id}
-              className="flex items-center justify-between gap-4 p-5 rounded-xl border border-gray-800 bg-gray-900"
+              className="border border-gray-800 rounded-xl p-5 bg-gray-900"
             >
-              <div>
-                <h3 className="font-semibold">
-                  {category.name}
-                </h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  /{category.slug}
-                </p>
-              </div>
+              {editingId === category.id ? (
+                /* Inline Edit */
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    autoFocus
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="flex-1 min-w-0 p-2.5 rounded-lg bg-gray-950 border border-gray-700 outline-none focus:border-blue-500"
+                  />
 
-              <div className="flex gap-2 shrink-0">
-                <button
-                  onClick={() => editCategory(category)}
-                  className="px-3 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"
-                >
-                  Edit
-                </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={saveCategory}
+                      disabled={saving}
+                      className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </button>
 
-                <button
-                  onClick={() => deleteCategory(category)}
-                  className="px-3 py-2 rounded-lg border border-red-800 text-red-400 hover:bg-red-950 text-sm"
-                >
-                  Delete
-                </button>
-              </div>
+                    <button
+                      onClick={cancelEdit}
+                      disabled={saving}
+                      className="px-3.5 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Normal View */
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold">
+                      {category.name}
+                    </h3>
+
+                    <p className="text-sm text-gray-500 mt-1">
+                      /{category.slug}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    <Link
+                      href={`/admin/manage/topics/${category.id}`}
+                      className="px-3 py-2 rounded-lg border border-blue-800 text-blue-400 hover:bg-blue-950 text-sm"
+                    >
+                      Manage Topics
+                    </Link>
+
+                    <button
+                      onClick={() => startEditing(category)}
+                      className="px-3 py-2 rounded-lg border border-gray-700 hover:bg-gray-800 text-sm"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => deleteCategory(category)}
+                      className="px-3 py-2 rounded-lg border border-red-800 text-red-400 hover:bg-red-950 text-sm"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
@@ -274,16 +338,6 @@ export default function ManagePage() {
             </p>
           )}
         </div>
-
-        <div className="mt-8">
-          <Link
-            href="/articles"
-            className="text-blue-400 hover:text-blue-300"
-          >
-            ← Back to Articles
-          </Link>
-        </div>
-
       </div>
     </main>
   );
