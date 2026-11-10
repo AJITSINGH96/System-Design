@@ -6,7 +6,9 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { JSONContent } from "@tiptap/core";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
+
+const ADMIN_ID = "128968c8-eea9-44f7-be54-2c32cab65e30";
 
 const ArticleViewer = dynamic(
   () => import("@/components/ArticleViewer"),
@@ -30,15 +32,27 @@ function ArticleContent() {
   const params = useParams<{ slug: string }>();
   const slug = params.slug;
 
+  const [supabase] = useState(() => createClient());
+
   const [article, setArticle] = useState<Article | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     async function fetchArticle() {
       try {
         setLoading(true);
         setError("");
+
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError) throw authError;
+
+        setIsAdmin(user?.id === ADMIN_ID);
 
         const { data, error } = await supabase
           .from("articles")
@@ -59,7 +73,7 @@ function ArticleContent() {
     }
 
     fetchArticle();
-  }, [slug]);
+  }, [slug, supabase]);
 
   if (loading) {
     return (
@@ -92,12 +106,23 @@ function ArticleContent() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-12">
-        <Link
-          href="/"
-          className="text-blue-400 hover:text-blue-300 text-sm"
-        >
-          ← Back to home
-        </Link>
+        <div className="flex items-center justify-between gap-4">
+          <Link
+            href="/"
+            className="text-blue-400 hover:text-blue-300 text-sm"
+          >
+            ← Back to home
+          </Link>
+
+          {isAdmin && (
+            <Link
+              href={`/admin/articles/${article.id}/edit`}
+              className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm"
+            >
+              Edit Article
+            </Link>
+          )}
+        </div>
 
         <p className="text-gray-500 text-sm mt-10 mb-4">
           Published{" "}

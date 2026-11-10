@@ -20,17 +20,24 @@ type Topic = {
   created_at: string;
 };
 
+type TopicArticle = {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+};
+
 function MyTopicsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Read the category ID reactively from the URL.
   const selectedCategoryId = searchParams.get("categoryId") ?? "";
 
   const [supabase] = useState(() => createClient());
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [currentUserId, setCurrentUserId] = useState("");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -40,6 +47,14 @@ function MyTopicsContent() {
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editCategoryId, setEditCategoryId] = useState("");
+
+  const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
+  const [topicArticles, setTopicArticles] = useState<
+    Record<string, TopicArticle[]>
+  >({});
+  const [loadingArticlesFor, setLoadingArticlesFor] = useState<string | null>(
+    null
+  );
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,8 +68,6 @@ function MyTopicsContent() {
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
-
-    // Clear the previous category's topics immediately.
     setTopics([]);
 
     try {
@@ -67,6 +80,8 @@ function MyTopicsContent() {
         router.replace("/login");
         return;
       }
+
+      setCurrentUserId(user.id);
 
       const [categoryResult, topicResult] = await Promise.all([
         supabase
@@ -102,7 +117,6 @@ function MyTopicsContent() {
     }
   }, [router, supabase, selectedCategoryId]);
 
-  // Reload whenever the category in the URL changes.
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -113,6 +127,45 @@ function MyTopicsContent() {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
+  }
+
+  async function toggleTopicArticles(topic: Topic) {
+    if (expandedTopicId === topic.id) {
+      setExpandedTopicId(null);
+      return;
+    }
+
+    setExpandedTopicId(topic.id);
+    setError("");
+
+    // Use cached articles if this topic has already been opened.
+    if (topicArticles[topic.id]) {
+      return;
+    }
+
+    setLoadingArticlesFor(topic.id);
+
+    try {
+      const { data, error: articlesError } = await supabase
+        .from("user_articles")
+        .select("id, title, status, created_at")
+        .eq("topic_id", topic.id)
+        .eq("user_id", currentUserId)
+        .order("created_at", { ascending: false });
+
+      if (articlesError) throw articlesError;
+
+      setTopicArticles((previous) => ({
+        ...previous,
+        [topic.id]: data ?? [],
+      }));
+    } catch (err) {
+      console.error("Topic articles loading error:", err);
+      setError("Unable to load articles for this topic.");
+      setExpandedTopicId(null);
+    } finally {
+      setLoadingArticlesFor(null);
+    }
   }
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
@@ -396,6 +449,9 @@ function MyTopicsContent() {
                   (item) => item.id === topic.category_id
                 );
 
+                const isExpanded = expandedTopicId === topic.id;
+                const articles = topicArticles[topic.id] ?? [];
+
                 return (
                   <div
                     key={topic.id}
@@ -437,6 +493,7 @@ function MyTopicsContent() {
 
                         <div className="flex gap-2">
                           <button
+                            type="button"
                             onClick={() => handleUpdate(topic.id)}
                             disabled={saving}
                             className="rounded-lg bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500 disabled:opacity-50"
@@ -445,6 +502,7 @@ function MyTopicsContent() {
                           </button>
 
                           <button
+                            type="button"
                             onClick={() => setEditingId(null)}
                             className="rounded-lg border border-gray-700 px-4 py-2 text-sm hover:bg-gray-800"
                           >
@@ -453,45 +511,132 @@ function MyTopicsContent() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <h3 className="font-semibold">📄{topic.title}</h3>
+                      <>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <h3 className="font-semibold">
+                              📄 {topic.title}
+                            </h3>
 
-                          <p className="mt-1 text-xs text-blue-400">
-                            {category?.name ?? "Category unavailable"}
-                          </p>
-
-                          {topic.description && (
-                            <p className="mt-2 text-sm text-gray-400">
-                              {topic.description}
+                            <p className="mt-1 text-xs text-blue-400">
+                              {category?.name ?? "Category unavailable"}
                             </p>
-                          )}
+
+                            {topic.description && (
+                              <p className="mt-2 text-sm text-gray-400">
+                                {topic.description}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => toggleTopicArticles(topic)}
+                              disabled={loadingArticlesFor === topic.id}
+                              className="rounded-lg border border-blue-800 px-4 py-2 text-sm text-blue-400 hover:bg-blue-950/40 disabled:opacity-50"
+                            >
+                              {loadingArticlesFor === topic.id
+                                ? "Loading..."
+                                : isExpanded
+                                  ? "Hide Articles"
+                                  : "Show Articles"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingId(topic.id);
+                                setEditTitle(topic.title);
+                                setEditDescription(topic.description ?? "");
+                                setEditCategoryId(topic.category_id);
+                                setError("");
+                                setMessage("");
+                              }}
+                              className="rounded-lg border border-gray-700 px-4 py-2 text-sm hover:bg-gray-800"
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(topic.id)}
+                              disabled={saving}
+                              className="rounded-lg border border-red-900 px-4 py-2 text-sm text-red-400 hover:bg-red-950/50 disabled:opacity-50"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
 
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingId(topic.id);
-                              setEditTitle(topic.title);
-                              setEditDescription(topic.description ?? "");
-                              setEditCategoryId(topic.category_id);
-                              setError("");
-                              setMessage("");
-                            }}
-                            className="rounded-lg border border-gray-700 px-4 py-2 text-sm hover:bg-gray-800"
-                          >
-                            Edit
-                          </button>
+                        {isExpanded && (
+                          <div className="mt-5 border-t border-gray-800 pt-4">
+                            <h4 className="mb-3 text-sm font-semibold">
+                              Articles in this topic
+                            </h4>
 
-                          <button
-                            onClick={() => handleDelete(topic.id)}
-                            disabled={saving}
-                            className="rounded-lg border border-red-900 px-4 py-2 text-sm text-red-400 hover:bg-red-950/50 disabled:opacity-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
+                            {loadingArticlesFor === topic.id ? (
+                              <p className="text-sm text-gray-400">
+                                Loading articles...
+                              </p>
+                            ) : articles.length === 0 ? (
+                              <p className="text-sm text-gray-400">
+                                No articles have been added to this topic yet.
+                              </p>
+                            ) : (
+                              <div className="space-y-2">
+                                {articles.map((article) => (
+                                  <div
+                                    key={article.id}
+                                    className="flex flex-col gap-3 rounded-lg border border-gray-800 bg-gray-950 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                  >
+                                    <div>
+                                      <p className="font-medium text-blue-400">
+                                        {article.title}
+                                      </p>
+
+                                      <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                                        <span>
+                                          Created{" "}
+                                          {new Date(
+                                            article.created_at
+                                          ).toLocaleDateString()}
+                                        </span>
+
+                                        <span
+                                          className={
+                                            article.status === "published"
+                                              ? "text-green-400"
+                                              : "text-yellow-400"
+                                          }
+                                        >
+                                          {article.status}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                      <Link
+                                        href={`/my-space/articles/${article.id}/view`}
+                                        className="rounded-lg border border-gray-700 px-3 py-2 text-center text-sm hover:bg-gray-800"
+                                      >
+                                        Open Article
+                                      </Link>
+
+                                      <Link
+                                        href={`/my-space/articles/${article.id}/edit`}
+                                        className="rounded-lg bg-blue-600 px-3 py-2 text-center text-sm hover:bg-blue-500"
+                                      >
+                                        Edit
+                                      </Link>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 );
