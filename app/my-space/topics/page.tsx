@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 type Category = {
@@ -20,8 +20,13 @@ type Topic = {
   created_at: string;
 };
 
-export default function MyTopicsPage() {
+function MyTopicsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Read the category ID reactively from the URL.
+  const selectedCategoryId = searchParams.get("categoryId") ?? "";
+
   const [supabase] = useState(() => createClient());
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -41,9 +46,16 @@ export default function MyTopicsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  const selectedCategory = categories.find(
+    (category) => category.id === selectedCategoryId
+  );
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
+
+    // Clear the previous category's topics immediately.
+    setTopics([]);
 
     try {
       const {
@@ -63,11 +75,18 @@ export default function MyTopicsPage() {
           .eq("user_id", user.id)
           .order("name"),
 
-        supabase
-          .from("user_topics")
-          .select("id, category_id, title, slug, description, created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false }),
+        (() => {
+          let query = supabase
+            .from("user_topics")
+            .select("id, category_id, title, slug, description, created_at")
+            .eq("user_id", user.id);
+
+          if (selectedCategoryId) {
+            query = query.eq("category_id", selectedCategoryId);
+          }
+
+          return query.order("created_at", { ascending: false });
+        })(),
       ]);
 
       if (categoryResult.error) throw categoryResult.error;
@@ -81,8 +100,9 @@ export default function MyTopicsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, supabase]);
+  }, [router, supabase, selectedCategoryId]);
 
+  // Reload whenever the category in the URL changes.
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -99,8 +119,9 @@ export default function MyTopicsPage() {
     event.preventDefault();
 
     const cleanTitle = title.trim();
+    const selectedId = categoryId || selectedCategoryId;
 
-    if (!cleanTitle || !categoryId) {
+    if (!cleanTitle || !selectedId) {
       setError("Enter a topic title and select a category.");
       return;
     }
@@ -124,7 +145,7 @@ export default function MyTopicsPage() {
         .from("user_topics")
         .insert({
           user_id: user.id,
-          category_id: categoryId,
+          category_id: selectedId,
           title: cleanTitle,
           slug: createSlug(cleanTitle),
           description: description.trim() || null,
@@ -241,19 +262,27 @@ export default function MyTopicsPage() {
 
       <main className="mx-auto max-w-5xl px-6 py-10">
         <Link
-          href="/my-space"
+          href="/my-space/categories"
           className="text-sm text-blue-400 hover:text-blue-300"
         >
-          ← Back to My Space
+          ← Back to My Categories
         </Link>
 
         <div className="mb-8 mt-6">
           <p className="text-sm font-medium text-blue-400">
             PERSONAL WORKSPACE
           </p>
-          <h1 className="mt-2 text-3xl font-bold">My Topics</h1>
+
+          <h1 className="mt-2 text-3xl font-bold">
+            {selectedCategory
+              ? `${selectedCategory.name} Topics`
+              : "My Topics"}
+          </h1>
+
           <p className="mt-2 text-gray-400">
-            Organize related articles under your personal categories.
+            {selectedCategory
+              ? `Manage topics belonging to ${selectedCategory.name}.`
+              : "Organize related articles under your personal categories."}
           </p>
         </div>
 
@@ -302,7 +331,7 @@ export default function MyTopicsPage() {
               />
 
               <select
-                value={categoryId}
+                value={categoryId || selectedCategoryId || ""}
                 onChange={(event) => setCategoryId(event.target.value)}
                 required
                 className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-3 text-sm outline-none focus:border-blue-500"
@@ -327,11 +356,27 @@ export default function MyTopicsPage() {
         </section>
 
         <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Your topics</h2>
-            <span className="text-sm text-gray-500">
-              {topics.length} topics
-            </span>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">
+                {selectedCategory
+                  ? `Topics in ${selectedCategory.name}`
+                  : "Your topics"}
+              </h2>
+
+              <span className="text-sm text-gray-500">
+                {topics.length} topics
+              </span>
+            </div>
+
+            {selectedCategoryId && (
+              <Link
+                href="/my-space/topics"
+                className="text-sm text-blue-400 hover:text-blue-300"
+              >
+                Show all topics →
+              </Link>
+            )}
           </div>
 
           {topics.length === 0 ? (
@@ -339,7 +384,9 @@ export default function MyTopicsPage() {
               <div className="text-4xl">🗂️</div>
               <h3 className="mt-4 text-lg font-semibold">No topics yet</h3>
               <p className="mt-2 text-sm text-gray-400">
-                Create your first topic to organize your articles.
+                {selectedCategory
+                  ? `There are no topics in ${selectedCategory.name} yet. Create your first topic above.`
+                  : "Create your first topic to organize your articles."}
               </p>
             </div>
           ) : (
@@ -396,6 +443,7 @@ export default function MyTopicsPage() {
                           >
                             Save
                           </button>
+
                           <button
                             onClick={() => setEditingId(null)}
                             className="rounded-lg border border-gray-700 px-4 py-2 text-sm hover:bg-gray-800"
@@ -408,9 +456,11 @@ export default function MyTopicsPage() {
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <h3 className="font-semibold">{topic.title}</h3>
+
                           <p className="mt-1 text-xs text-blue-400">
                             {category?.name ?? "Category unavailable"}
                           </p>
+
                           {topic.description && (
                             <p className="mt-2 text-sm text-gray-400">
                               {topic.description}
@@ -432,6 +482,7 @@ export default function MyTopicsPage() {
                           >
                             Edit
                           </button>
+
                           <button
                             onClick={() => handleDelete(topic.id)}
                             disabled={saving}
@@ -450,5 +501,19 @@ export default function MyTopicsPage() {
         </section>
       </main>
     </div>
+  );
+}
+
+export default function MyTopicsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gray-950 text-gray-300">
+          Loading your topics...
+        </div>
+      }
+    >
+      <MyTopicsContent />
+    </Suspense>
   );
 }

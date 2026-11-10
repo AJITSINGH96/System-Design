@@ -40,13 +40,17 @@ export default function NotificationBell() {
     setError("");
 
     try {
+      // Get the current session safely.
       const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (authError) throw authError;
+      if (sessionError) throw sessionError;
 
+      const user = session?.user;
+
+      // No active session: clear notifications and exit gracefully.
       if (!user) {
         setNotifications([]);
         return;
@@ -136,90 +140,104 @@ export default function NotificationBell() {
     }
   }, [supabase]);
 
- useEffect(() => {
-  let channel: ReturnType<typeof supabase.channel> | null = null;
-  let cancelled = false;
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
 
-  async function setupNotifications() {
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
+    async function setupNotifications() {
+      try {
+        // Check for an existing session without throwing
+        // an AuthSessionMissingError when the user is logged out.
+        const {
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-    if (error || !user || cancelled) return;
+        if (sessionError) throw sessionError;
 
-    // Load notifications immediately when the component mounts.
-    await loadNotifications();
+        const user = session?.user;
 
-    if (cancelled) return;
+        if (!user || cancelled) return;
 
-    // Listen for new notifications in real time.
-    channel = supabase
-      .channel(`notifications-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "notifications",
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          loadNotifications();
+        // Load notifications immediately.
+        await loadNotifications();
+
+        if (cancelled) return;
+
+        // Subscribe to new notifications in real time.
+        channel = supabase
+          .channel(`notifications-${user.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "notifications",
+              filter: `user_id=eq.${user.id}`,
+            },
+            () => {
+              loadNotifications();
+            }
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "notifications",
+              filter: `user_id=eq.${user.id}`,
+            },
+            () => {
+              loadNotifications();
+            }
+          )
+          .subscribe();
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Notification setup error:", err);
         }
-      )
-            .on(
-        "postgres_changes",
-        {
-            event: "UPDATE",
-            schema: "public",
-            table: "notifications",
-            filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-            loadNotifications();
-        }
-        )
-      .subscribe();
-  }
-
-  setupNotifications();
-
-  return () => {
-    cancelled = true;
-
-    if (channel) {
-      void supabase.removeChannel(channel);
+      }
     }
-  };
-}, [supabase, loadNotifications]);
 
-  async function handleNotificationClick(notification: NotificationItem) {
-  if (!notification.read_at) {
-    const readAt = new Date().toISOString();
+    setupNotifications();
 
-    const { error: updateError } = await supabase
-      .from("notifications")
-      .update({ read_at: readAt })
-      .eq("id", notification.id);
+    return () => {
+      cancelled = true;
 
-    if (updateError) {
-      console.error("Mark notification as read error:", updateError);
-    } else {
-      // Immediately update the local unread count.
-      setNotifications((previous) =>
-        previous.map((item) =>
-          item.id === notification.id
-            ? { ...item, read_at: readAt }
-            : item
-        )
-      );
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [supabase, loadNotifications]);
+
+  async function handleNotificationClick(
+    notification: NotificationItem
+  ) {
+    if (!notification.read_at) {
+      const readAt = new Date().toISOString();
+
+      const { error: updateError } = await supabase
+        .from("notifications")
+        .update({ read_at: readAt })
+        .eq("id", notification.id);
+
+      if (updateError) {
+        console.error("Mark notification as read error:", updateError);
+      } else {
+        // Immediately update the local unread count.
+        setNotifications((previous) =>
+          previous.map((item) =>
+            item.id === notification.id
+              ? { ...item, read_at: readAt }
+              : item
+          )
+        );
+      }
     }
-  }
 
-  router.push(`/community/articles/${notification.article_id}`);
-  setOpen(false);
-}
+    router.push(`/community/articles/${notification.article_id}`);
+    setOpen(false);
+  }
 
   return (
     <div className="relative">

@@ -261,7 +261,10 @@ export default function MyCategoriesPage() {
             Create a new category
           </h2>
 
-          <form onSubmit={handleCreate} className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <form
+            onSubmit={handleCreate}
+            className="mt-5 flex flex-col gap-3 sm:flex-row"
+          >
             <input
               type="text"
               value={newName}
@@ -327,29 +330,38 @@ export default function MyCategoriesPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     {editingId === category.id ? (
                       <>
                         <button
                           onClick={() => handleUpdate(category.id)}
                           disabled={saving}
-                          className="rounded-lg bg-blue-600 px-4 py-2 text-sm hover:bg-blue-500 disabled:opacity-50"
+                          className="rounded-lg bg-blue-600 px-3.5 py-1.5 text-sm hover:bg-blue-500 disabled:opacity-50"
                         >
                           Save
                         </button>
+
                         <button
                           onClick={() => {
                             setEditingId(null);
                             setEditingName("");
                             setError("");
                           }}
-                          className="rounded-lg border border-gray-700 px-4 py-2 text-sm hover:bg-gray-800"
+                          disabled={saving}
+                          className="rounded-lg border border-gray-700 px-3.5 py-1.5 text-sm hover:bg-gray-800"
                         >
                           Cancel
                         </button>
                       </>
                     ) : (
                       <>
+                        <Link
+                          href={`/my-space/topics?categoryId=${category.id}`}
+                          className="rounded-lg border border-blue-800 px-3 py-1.5 text-sm text-blue-400 transition hover:bg-blue-950/50"
+                        >
+                          Manage Topics
+                        </Link>
+
                         <button
                           onClick={() => {
                             setEditingId(category.id);
@@ -357,14 +369,15 @@ export default function MyCategoriesPage() {
                             setError("");
                             setMessage("");
                           }}
-                          className="rounded-lg border border-gray-700 px-4 py-2 text-sm hover:bg-gray-800"
+                          className="rounded-lg border border-gray-700 px-3 py-1.5 text-sm hover:bg-gray-800"
                         >
                           Edit
                         </button>
+
                         <button
                           onClick={() => handleDelete(category.id)}
                           disabled={saving}
-                          className="rounded-lg border border-red-900 px-4 py-2 text-sm text-red-400 hover:bg-red-950/50 disabled:opacity-50"
+                          className="rounded-lg border border-red-900 px-3 py-1.5 text-sm text-red-400 hover:bg-red-950/50 disabled:opacity-50"
                         >
                           Delete
                         </button>
