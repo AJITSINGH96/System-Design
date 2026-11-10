@@ -297,7 +297,7 @@ export default function ManagePage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="min-w-0">
                     <h3 className="font-semibold">
-                      {category.name}
+                    📁 {category.name}
                     </h3>
 
                     <p className="text-sm text-gray-500 mt-1">

@@ -455,7 +455,7 @@ function MyTopicsContent() {
                     ) : (
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <h3 className="font-semibold">{topic.title}</h3>
+                          <h3 className="font-semibold">📄{topic.title}</h3>
 
                           <p className="mt-1 text-xs text-blue-400">
                             {category?.name ?? "Category unavailable"}

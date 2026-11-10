@@ -281,7 +281,7 @@ function ManageTopicsContent() {
             >
               <div className="min-w-0">
                 <h3 className="font-semibold">
-                  {topic.title}
+                📄 {topic.title}
                 </h3>
                 <p className="text-sm text-gray-400 mt-1">
                   {topic.description}
